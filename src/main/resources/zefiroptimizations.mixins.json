@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "ua.zefir.zefiroptimizations.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "Vec3dMixin",
+    "WorkStationCompetitionTaskMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+	}
+}
