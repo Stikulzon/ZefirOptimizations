@@ -19,10 +19,4 @@ public class WorkStationCompetitionTaskMixin {
             cir.setReturnValue(WorkStationCompetitionTaskModified.create());
         }
     }
-//    @Inject(method = "keepJobSiteForMoreExperiencedVillager", at = @At("HEAD"), cancellable = true)
-//    private static void keepJobSiteForMoreExperiencedVillager(CallbackInfoReturnable<Task<VillagerEntity>> cir){
-//        if(isOptimizeVillagers) {
-//            System.out.println("!!!keepJobSiteForMoreExperiencedVillager!!!");
-//        }
-//    }
 }

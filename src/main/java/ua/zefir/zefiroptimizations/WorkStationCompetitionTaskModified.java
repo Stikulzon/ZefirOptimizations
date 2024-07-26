@@ -1,20 +1,30 @@
 package ua.zefir.zefiroptimizations;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.brain.Brain;
 import net.minecraft.entity.ai.brain.MemoryModuleType;
+import net.minecraft.entity.ai.brain.MemoryQueryResult;
 import net.minecraft.entity.ai.brain.task.Task;
 import net.minecraft.entity.ai.brain.task.TaskTriggerer;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.GlobalPos;
 import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.poi.PointOfInterestType;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class WorkStationCompetitionTaskModified {
+    private static final Cache<GlobalPos, Optional<RegistryEntry<PointOfInterestType>>> poiTypeCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .build();
+
     public static Task<VillagerEntity> create() {
         return TaskTriggerer.task(
                 context -> context.group(context.queryMemoryValue(MemoryModuleType.JOB_SITE), context.queryMemoryValue(MemoryModuleType.MOBS))
@@ -22,7 +32,7 @@ public class WorkStationCompetitionTaskModified {
                                 context,
                                 (jobSite, mobs) -> (world, entity, time) -> {
                                     GlobalPos globalPos = context.getValue(jobSite);
-                                    Optional<RegistryEntry<PointOfInterestType>> poiTypeOpt = world.getPointOfInterestStorage().getType(globalPos.pos());
+                                    Optional<RegistryEntry<PointOfInterestType>> poiTypeOpt = getPointOfInterestType(world, globalPos);
 
                                     if (poiTypeOpt.isPresent()) {
                                         List<LivingEntity> villagerEntities = context.getValue(mobs);
@@ -38,11 +48,18 @@ public class WorkStationCompetitionTaskModified {
                                             }
                                         }
                                     }
-
                                     return true;
                                 }
                         )
         );
+    }
+
+    private static Optional<RegistryEntry<PointOfInterestType>> getPointOfInterestType(ServerWorld world, GlobalPos pos) {
+        try {
+            return poiTypeCache.get(pos, () -> world.getPointOfInterestStorage().getType(pos.pos()));
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static VillagerEntity keepJobSiteForMoreExperiencedVillager(VillagerEntity first, VillagerEntity second) {

@@ -3,7 +3,7 @@
   "package": "ua.zefir.zefiroptimizations.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "Vec3dMixin",
+    "LivingEntityMixin",
     "WorkStationCompetitionTaskMixin"
   ],
   "injectors": {
