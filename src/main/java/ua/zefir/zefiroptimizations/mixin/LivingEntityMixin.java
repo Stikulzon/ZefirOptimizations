@@ -4,12 +4,9 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.Flutterer;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MovementType;
-import net.minecraft.entity.ai.brain.task.Task;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.vehicle.AbstractMinecartEntity;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.registry.tag.FluidTags;
@@ -27,13 +24,9 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import ua.zefir.zefiroptimizations.WorkStationCompetitionTaskModified;
 
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-
-import static ua.zefir.zefiroptimizations.Commands.isOptimizeVillagers;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin {
@@ -234,130 +227,159 @@ public abstract class LivingEntityMixin {
     @Unique
     public void customTravel(Vec3d movementInput) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if (self.isLogicalSideForUpdatingMovement()) {
-            double d = self.getFinalGravity();
-            boolean bl = self.getVelocity().y <= 0.0;
-            if (bl && self.hasStatusEffect(StatusEffects.SLOW_FALLING)) {
-                d = Math.min(d, 0.01);
-            }
 
-            FluidState fluidState = self.getWorld().getFluidState(self.getBlockPos());
-            if (self.isTouchingWater() && this.shouldSwimInFluids() && !self.canWalkOnFluid(fluidState)) {
-                double e = self.getY();
-                float f = self.isSprinting() ? 0.9F : getBaseMovementSpeedMultiplier();
-                float g = 0.02F;
-                float h = (float)self.getAttributeValue(EntityAttributes.GENERIC_WATER_MOVEMENT_EFFICIENCY);
-                if (!self.isOnGround()) {
-                    h *= 0.5F;
-                }
+        if (!self.isLogicalSideForUpdatingMovement()) {
+            return;
+        }
 
-                if (h > 0.0F) {
-                    f += (0.54600006F - f) * h;
-                    g += (self.getMovementSpeed() - g) * h;
-                }
+        double gravity = self.getFinalGravity();
+        boolean isFalling = self.getVelocity().y <= 0.0;
+        if (isFalling && self.hasStatusEffect(StatusEffects.SLOW_FALLING)) {
+            gravity = Math.min(gravity, 0.01);
+        }
 
-                if (self.hasStatusEffect(StatusEffects.DOLPHINS_GRACE)) {
-                    f = 0.96F;
-                }
+        FluidState fluidState = self.getWorld().getFluidState(self.getBlockPos());
 
-                self.updateVelocity(g, movementInput);
-                self.move(MovementType.SELF, self.getVelocity());
-                Vec3d vec3d = self.getVelocity();
-                if (self.horizontalCollision && self.isClimbing()) {
-                    vec3d = new Vec3d(vec3d.x, 0.2, vec3d.z);
-                }
-
-                self.setVelocity(vec3d.multiply(f, 0.8F, f));
-                Vec3d vec3d2 = self.applyFluidMovingSpeed(d, bl, self.getVelocity());
-                self.setVelocity(vec3d2);
-                if (self.horizontalCollision && self.doesNotCollide(vec3d2.x, vec3d2.y + 0.6F - self.getY() + e, vec3d2.z)) {
-                    self.setVelocity(vec3d2.x, 0.3F, vec3d2.z);
-                }
-            } else if (self.isInLava() && this.shouldSwimInFluids() && !self.canWalkOnFluid(fluidState)) {
-                double ex = self.getY();
-                self.updateVelocity(0.02F, movementInput);
-                self.move(MovementType.SELF, self.getVelocity());
-                if (self.getFluidHeight(FluidTags.LAVA) <= self.getSwimHeight()) {
-                    self.setVelocity(self.getVelocity().multiply(0.5, 0.8F, 0.5));
-                    Vec3d vec3d3 = self.applyFluidMovingSpeed(d, bl, self.getVelocity());
-                    self.setVelocity(vec3d3);
-                } else {
-                    self.setVelocity(self.getVelocity().multiply(0.5));
-                }
-
-                if (d != 0.0) {
-                    self.setVelocity(self.getVelocity().add(0.0, -d / 4.0, 0.0));
-                }
-
-                Vec3d vec3d3 = self.getVelocity();
-                if (self.horizontalCollision && self.doesNotCollide(vec3d3.x, vec3d3.y + 0.6F - self.getY() + ex, vec3d3.z)) {
-                    self.setVelocity(vec3d3.x, 0.3F, vec3d3.z);
-                }
-            } else if (self.isFallFlying()) {
-                self.limitFallDistance();
-                Vec3d vec3d4 = self.getVelocity();
-                Vec3d vec3d5 = self.getRotationVector();
-                float fx = self.getPitch() * (float) (Math.PI / 180.0);
-                double i = Math.sqrt(vec3d5.x * vec3d5.x + vec3d5.z * vec3d5.z);
-                double j = vec3d4.horizontalLength();
-                double k = vec3d5.length();
-                double l = Math.cos((double)fx);
-                l = l * l * Math.min(1.0, k / 0.4);
-                vec3d4 = self.getVelocity().add(0.0, d * (-1.0 + l * 0.75), 0.0);
-                if (vec3d4.y < 0.0 && i > 0.0) {
-                    double m = vec3d4.y * -0.1 * l;
-                    vec3d4 = vec3d4.add(vec3d5.x * m / i, m, vec3d5.z * m / i);
-                }
-
-                if (fx < 0.0F && i > 0.0) {
-                    double m = j * (double)(-MathHelper.sin(fx)) * 0.04;
-                    vec3d4 = vec3d4.add(-vec3d5.x * m / i, m * 3.2, -vec3d5.z * m / i);
-                }
-
-                if (i > 0.0) {
-                    vec3d4 = vec3d4.add((vec3d5.x / i * j - vec3d4.x) * 0.1, 0.0, (vec3d5.z / i * j - vec3d4.z) * 0.1);
-                }
-
-                self.setVelocity(vec3d4.multiply(0.99F, 0.98F, 0.99F));
-                self.move(MovementType.SELF, self.getVelocity());
-                if (self.horizontalCollision && !self.getWorld().isClient) {
-                    double m = self.getVelocity().horizontalLength();
-                    double n = j - m;
-                    float o = (float)(n * 10.0 - 3.0);
-                    if (o > 0.0F) {
-                        self.playSound(getFallSound((int)o), 1.0F, 1.0F);
-                        self.damage(self.getDamageSources().flyIntoWall(), o);
-                    }
-                }
-
-                if (self.isOnGround() && !self.getWorld().isClient) {
-                    self.setFlag(Entity.FALL_FLYING_FLAG_INDEX, false);
-                }
-            } else {
-                BlockPos blockPos = self.getVelocityAffectingPos();
-                float p = self.getWorld().getBlockState(blockPos).getBlock().getSlipperiness();
-                float fxx = self.isOnGround() ? p * 0.91F : 0.91F;
-                Vec3d vec3d6 = self.applyMovementInput(movementInput, p);
-                double q = vec3d6.y;
-                if (self.hasStatusEffect(StatusEffects.LEVITATION)) {
-                    q += (0.05 * (double)(self.getStatusEffect(StatusEffects.LEVITATION).getAmplifier() + 1) - vec3d6.y) * 0.2;
-                } else if (!self.getWorld().isClient || self.getWorld().isChunkLoaded(blockPos)) {
-                    q -= d;
-                } else if (self.getY() > (double)self.getWorld().getBottomY()) {
-                    q = -0.1;
-                } else {
-                    q = 0.0;
-                }
-
-                if (self.hasNoDrag()) {
-                    self.setVelocity(vec3d6.x, q, vec3d6.z);
-                } else {
-                    self.setVelocity(vec3d6.x * (double)fxx, this instanceof Flutterer ? q * (double)fxx : q * 0.98F, vec3d6.z * (double)fxx);
-                }
-            }
+        if (self.isTouchingWater() && shouldSwimInFluids() && !self.canWalkOnFluid(fluidState)) {
+            handleWaterMovement(self, movementInput, gravity, isFalling);
+        } else if (self.isInLava() && shouldSwimInFluids() && !self.canWalkOnFluid(fluidState)) {
+            handleLavaMovement(self, movementInput, gravity, isFalling);
+        } else if (self.isFallFlying()) {
+            handleFallFlying(self, movementInput, gravity);
+        } else {
+            handleDefaultMovement(self, movementInput, gravity);
         }
 
         self.updateLimbs(this instanceof Flutterer);
+    }
+
+    @Unique
+    private void handleWaterMovement(LivingEntity self, Vec3d movementInput, double gravity, boolean isFalling) {
+        double initialY = self.getY();
+        float baseSpeed = self.isSprinting() ? 0.9F : getBaseMovementSpeedMultiplier();
+        float velocityMultiplier = 0.02F;
+        float waterEfficiency = (float) self.getAttributeValue(EntityAttributes.GENERIC_WATER_MOVEMENT_EFFICIENCY);
+        if (!self.isOnGround()) {
+            waterEfficiency *= 0.5F;
+        }
+
+        if (waterEfficiency > 0.0F) {
+            baseSpeed += (0.54600006F - baseSpeed) * waterEfficiency;
+            velocityMultiplier += (self.getMovementSpeed() - velocityMultiplier) * waterEfficiency;
+        }
+
+        if (self.hasStatusEffect(StatusEffects.DOLPHINS_GRACE)) {
+            baseSpeed = 0.96F;
+        }
+
+        self.updateVelocity(velocityMultiplier, movementInput);
+        self.move(MovementType.SELF, self.getVelocity());
+        Vec3d velocity = self.getVelocity();
+
+        if (self.horizontalCollision && self.isClimbing()) {
+            velocity = new Vec3d(velocity.x, 0.2, velocity.z);
+        }
+
+        self.setVelocity(velocity.multiply(baseSpeed, 0.8F, baseSpeed));
+        Vec3d newVelocity = self.applyFluidMovingSpeed(gravity, isFalling, self.getVelocity());
+        self.setVelocity(newVelocity);
+
+        if (self.horizontalCollision && self.doesNotCollide(newVelocity.x, newVelocity.y + 0.6F - self.getY() + initialY, newVelocity.z)) {
+            self.setVelocity(newVelocity.x, 0.3F, newVelocity.z);
+        }
+    }
+
+    @Unique
+    private void handleLavaMovement(LivingEntity self, Vec3d movementInput, double gravity, boolean isFalling) {
+        double initialY = self.getY();
+        self.updateVelocity(0.02F, movementInput);
+        self.move(MovementType.SELF, self.getVelocity());
+
+        if (self.getFluidHeight(FluidTags.LAVA) <= self.getSwimHeight()) {
+            self.setVelocity(self.getVelocity().multiply(0.5, 0.8F, 0.5));
+            Vec3d newVelocity = self.applyFluidMovingSpeed(gravity, isFalling, self.getVelocity());
+            self.setVelocity(newVelocity);
+        } else {
+            self.setVelocity(self.getVelocity().multiply(0.5));
+        }
+
+        if (gravity != 0.0) {
+            self.setVelocity(self.getVelocity().add(0.0, -gravity / 4.0, 0.0));
+        }
+
+        Vec3d velocity = self.getVelocity();
+        if (self.horizontalCollision && self.doesNotCollide(velocity.x, velocity.y + 0.6F - self.getY() + initialY, velocity.z)) {
+            self.setVelocity(velocity.x, 0.3F, velocity.z);
+        }
+    }
+
+    @Unique
+    private void handleFallFlying(LivingEntity self, Vec3d movementInput, double gravity) {
+        self.limitFallDistance();
+        Vec3d velocity = self.getVelocity();
+        Vec3d rotationVector = self.getRotationVector();
+        float pitchRadians = self.getPitch() * (float) (Math.PI / 180.0);
+        double horizontalLength = Math.sqrt(rotationVector.x * rotationVector.x + rotationVector.z * rotationVector.z);
+        double velocityHorizontalLength = velocity.horizontalLength();
+        double rotationVectorLength = rotationVector.length();
+        double cosinePitch = Math.cos(pitchRadians);
+        cosinePitch = cosinePitch * cosinePitch * Math.min(1.0, rotationVectorLength / 0.4);
+        velocity = self.getVelocity().add(0.0, gravity * (-1.0 + cosinePitch * 0.75), 0.0);
+
+        if (velocity.y < 0.0 && horizontalLength > 0.0) {
+            double negativeVelocityY = velocity.y * -0.1 * cosinePitch;
+            velocity = velocity.add(rotationVector.x * negativeVelocityY / horizontalLength, negativeVelocityY, rotationVector.z * negativeVelocityY / horizontalLength);
+        }
+
+        if (pitchRadians < 0.0F && horizontalLength > 0.0) {
+            double negativeSinPitch = velocityHorizontalLength * (double) (-MathHelper.sin(pitchRadians)) * 0.04;
+            velocity = velocity.add(-rotationVector.x * negativeSinPitch / horizontalLength, negativeSinPitch * 3.2, -rotationVector.z * negativeSinPitch / horizontalLength);
+        }
+
+        if (horizontalLength > 0.0) {
+            velocity = velocity.add((rotationVector.x / horizontalLength * velocityHorizontalLength - velocity.x) * 0.1, 0.0, (rotationVector.z / horizontalLength * velocityHorizontalLength - velocity.z) * 0.1);
+        }
+
+        self.setVelocity(velocity.multiply(0.99F, 0.98F, 0.99F));
+        self.move(MovementType.SELF, self.getVelocity());
+
+        if (self.horizontalCollision && !self.getWorld().isClient) {
+            double finalHorizontalLength = self.getVelocity().horizontalLength();
+            double difference = velocityHorizontalLength - finalHorizontalLength;
+            float damage = (float) (difference * 10.0 - 3.0);
+            if (damage > 0.0F) {
+                self.playSound(getFallSound((int) damage), 1.0F, 1.0F);
+                self.damage(self.getDamageSources().flyIntoWall(), damage);
+            }
+        }
+
+        if (self.isOnGround() && !self.getWorld().isClient) {
+            self.setFlag(Entity.FALL_FLYING_FLAG_INDEX, false);
+        }
+    }
+
+    private void handleDefaultMovement(LivingEntity self, Vec3d movementInput, double gravity) {
+        BlockPos blockPos = self.getVelocityAffectingPos();
+        float blockSlipperiness = self.getWorld().getBlockState(blockPos).getBlock().getSlipperiness();
+        float slipperiness = self.isOnGround() ? blockSlipperiness * 0.91F : 0.91F;
+        Vec3d velocity = self.applyMovementInput(movementInput, blockSlipperiness);
+        double yVelocity = velocity.y;
+
+        if (self.hasStatusEffect(StatusEffects.LEVITATION)) {
+            yVelocity += (0.05 * (double) (self.getStatusEffect(StatusEffects.LEVITATION).getAmplifier() + 1) - velocity.y) * 0.2;
+        } else if (!self.getWorld().isClient || self.getWorld().isChunkLoaded(blockPos)) {
+            yVelocity -= gravity;
+        } else if (self.getY() > (double) self.getWorld().getBottomY()) {
+            yVelocity = -0.1;
+        } else {
+            yVelocity = 0.0;
+        }
+
+        if (self.hasNoDrag()) {
+            self.setVelocity(velocity.x, yVelocity, velocity.z);
+        } else {
+            self.setVelocity(velocity.x * (double) slipperiness, this instanceof Flutterer ? yVelocity * (double) slipperiness : yVelocity * 0.98F, velocity.z * (double) slipperiness);
+        }
     }
 
     @Unique
