@@ -24,7 +24,9 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import ua.zefir.zefiroptimizations.ThreadPoolManager;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -358,6 +360,7 @@ public abstract class LivingEntityMixin {
         }
     }
 
+    @Unique
     private void handleDefaultMovement(LivingEntity self, Vec3d movementInput, double gravity) {
         BlockPos blockPos = self.getVelocityAffectingPos();
         float blockSlipperiness = self.getWorld().getBlockState(blockPos).getBlock().getSlipperiness();
