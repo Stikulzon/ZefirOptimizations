@@ -3,6 +3,8 @@
   "package": "ua.zefir.zefiroptimizations.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "BlockCollisionSpliteratorMixin",
+    "CollisionViewMixin",
     "EntityMixin",
     "LivingEntityMixin",
     "WorkStationCompetitionTaskMixin"

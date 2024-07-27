@@ -21,6 +21,11 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.Optional;
+
+import static ua.zefir.zefiroptimizations.Commands.*;
 
 @Mixin(Entity.class)
 public abstract class EntityMixin {
@@ -63,165 +68,191 @@ public abstract class EntityMixin {
 
     @Inject(method = "move", at = @At(value = "HEAD"), cancellable = true)
     private void move(MovementType movementType, Vec3d movement, CallbackInfo ci){
-//        if(isOptimizeVillagers) {
-        this.customMove(movementType, movement);
-        ci.cancel();
-//        }
+        if(entityOptimizations1) {
+            this.customMove(movementType, movement);
+            ci.cancel();
+        }
+    }
+    @Inject(method = "getPosWithYOffset", at = @At(value = "HEAD"), cancellable = true)
+    private void getPosWithYOffset(float offset, CallbackInfoReturnable<BlockPos> cir){
+        if(entityOptimizations2) {
+            this.getPosWithYOffsetCustom(offset);
+            cir.cancel();
+        }
     }
 
     @Unique
     public void customMove(MovementType movementType, Vec3d movement) {
         Entity self = (Entity) (Object) this;
+
         if (self.noClip) {
             self.setPosition(self.getX() + movement.x, self.getY() + movement.y, self.getZ() + movement.z);
-        } else {
-            self.wasOnFire = self.isOnFire();
-            if (movementType == MovementType.PISTON) {
-                movement = adjustMovementForPiston(movement);
-                if (movement.equals(Vec3d.ZERO)) {
-                    return;
-                }
-            }
+            return;
+        }
 
-            self.getWorld().getProfiler().push("move");
-            if (movementMultiplier.lengthSquared() > 1.0E-7) {
-                movement = movement.multiply(movementMultiplier);
-                movementMultiplier = Vec3d.ZERO;
-                self.setVelocity(Vec3d.ZERO);
-            }
+        self.wasOnFire = self.isOnFire();
 
-            movement = adjustMovementForSneaking(movement, movementType);
-            Vec3d vec3d = adjustMovementForCollisions(movement);
-            double d = vec3d.lengthSquared();
-            if (d > 1.0E-7) {
-                if (self.fallDistance != 0.0F && d >= 1.0) {
-                    BlockHitResult blockHitResult = self.getWorld()
-                            .raycast(new RaycastContext(self.getPos(), self.getPos().add(vec3d), RaycastContext.ShapeType.FALLDAMAGE_RESETTING, RaycastContext.FluidHandling.WATER, self));
-                    if (blockHitResult.getType() != HitResult.Type.MISS) {
-                        self.onLanding();
-                    }
-                }
-
-                self.setPosition(self.getX() + vec3d.x, self.getY() + vec3d.y, self.getZ() + vec3d.z);
-            }
-
-            self.getWorld().getProfiler().pop();
-            self.getWorld().getProfiler().push("rest");
-            boolean bl = !MathHelper.approximatelyEquals(movement.x, vec3d.x);
-            boolean bl2 = !MathHelper.approximatelyEquals(movement.z, vec3d.z);
-            self.horizontalCollision = bl || bl2;
-            self.verticalCollision = movement.y != vec3d.y;
-            self.groundCollision = self.verticalCollision && movement.y < 0.0;
-            if (self.horizontalCollision) {
-                self.collidedSoftly = hasCollidedSoftly(vec3d);
-            } else {
-                self.collidedSoftly = false;
-            }
-
-            self.setOnGround(self.groundCollision, vec3d);
-            BlockPos blockPos = self.getLandingPos();
-            BlockState blockState = self.getWorld().getBlockState(blockPos);
-            fall(vec3d.y, self.isOnGround(), blockState, blockPos);
-            if (self.isRemoved()) {
-                self.getWorld().getProfiler().pop();
-            } else {
-                if (self.horizontalCollision) {
-                    Vec3d vec3d2 = self.getVelocity();
-                    self.setVelocity(bl ? 0.0 : vec3d2.x, vec3d2.y, bl2 ? 0.0 : vec3d2.z);
-                }
-
-                Block block = blockState.getBlock();
-                if (movement.y != vec3d.y) {
-                    block.onEntityLand(self.getWorld(), self);
-                }
-
-                if (self.isOnGround()) {
-                    block.onSteppedOn(self.getWorld(), blockPos, blockState, self);
-                }
-
-                Entity.MoveEffect moveEffect = getMoveEffect();
-                if (moveEffect.hasAny() && !self.hasVehicle()) {
-                    double e = vec3d.x;
-                    double f = vec3d.y;
-                    double g = vec3d.z;
-                    self.speed = self.speed + (float)(vec3d.length() * 0.6);
-                    BlockPos blockPos2 = self.getSteppingPos();
-                    BlockState blockState2 = self.getWorld().getBlockState(blockPos2);
-                    boolean bl3 = canClimb(blockState2);
-                    if (!bl3) {
-                        f = 0.0;
-                    }
-
-                    self.horizontalSpeed = self.horizontalSpeed + (float)vec3d.horizontalLength() * 0.6F;
-                    self.distanceTraveled = self.distanceTraveled + (float)Math.sqrt(e * e + f * f + g * g) * 0.6F;
-                    if (self.distanceTraveled > nextStepSoundDistance && !blockState2.isAir()) {
-                        boolean bl4 = blockPos2.equals(blockPos);
-                        boolean bl5 = stepOnBlock(blockPos, blockState, moveEffect.playsSounds(), bl4, movement);
-                        if (!bl4) {
-                            bl5 |= stepOnBlock(blockPos2, blockState2, false, moveEffect.emitsGameEvents(), movement);
-                        }
-
-                        if (bl5) {
-                            nextStepSoundDistance = calculateNextStepSoundDistance();
-                        } else if (self.isTouchingWater()) {
-                            nextStepSoundDistance = calculateNextStepSoundDistance();
-                            if (moveEffect.playsSounds()) {
-                                playSwimSound();
-                            }
-
-                            if (moveEffect.emitsGameEvents()) {
-                                self.emitGameEvent(GameEvent.SWIM);
-                            }
-                        }
-                    } else if (blockState2.isAir()) {
-                        addAirTravelEffects();
-                    }
-                }
-
-                tryCheckBlockCollision();
-                float h = getVelocityMultiplier();
-                self.setVelocity(self.getVelocity().multiply((double)h, 1.0, (double)h));
-                if (self.getWorld()
-                        .getStatesInBoxIfLoaded(self.getBoundingBox().contract(1.0E-6))
-                        .noneMatch(state -> state.isIn(BlockTags.FIRE) || state.isOf(Blocks.LAVA))) {
-                    if (fireTicks <= 0) {
-                        self.setFireTicks(-getBurningDuration());
-                    }
-
-                    if (self.wasOnFire && (self.inPowderSnow || self.isWet())) {
-                        playExtinguishSound();
-                    }
-                }
-
-                if (self.isOnFire() && (self.inPowderSnow || self.isWet())) {
-                    self.setFireTicks(-getBurningDuration());
-                }
-
-                self.getWorld().getProfiler().pop();
+        if (movementType == MovementType.PISTON) {
+            movement = adjustMovementForPiston(movement);
+            if (movement.equals(Vec3d.ZERO)) {
+                return;
             }
         }
+
+        self.getWorld().getProfiler().push("move");
+
+        if (movementMultiplier.lengthSquared() > 1.0E-7) {
+            movement = movement.multiply(movementMultiplier);
+            movementMultiplier = Vec3d.ZERO;
+            self.setVelocity(Vec3d.ZERO);
+        }
+
+        movement = adjustMovementForSneaking(movement, movementType);
+        Vec3d adjustedMovement = adjustMovementForCollisions(movement);
+        double adjustedMovementLengthSquared = adjustedMovement.lengthSquared();
+
+        if (adjustedMovementLengthSquared > 1.0E-7) {
+            if (self.fallDistance != 0.0F && adjustedMovementLengthSquared >= 1.0) {
+                BlockHitResult blockHitResult = self.getWorld()
+                        .raycast(new RaycastContext(self.getPos(), self.getPos().add(adjustedMovement), RaycastContext.ShapeType.FALLDAMAGE_RESETTING, RaycastContext.FluidHandling.WATER, self));
+                if (blockHitResult.getType() != HitResult.Type.MISS) {
+                    self.onLanding();
+                }
+            }
+
+            self.setPosition(self.getX() + adjustedMovement.x, self.getY() + adjustedMovement.y, self.getZ() + adjustedMovement.z);
+        }
+
+        self.getWorld().getProfiler().pop();
+        self.getWorld().getProfiler().push("rest");
+
+        boolean horizontalCollision = !MathHelper.approximatelyEquals(movement.x, adjustedMovement.x) || !MathHelper.approximatelyEquals(movement.z, adjustedMovement.z);
+        boolean verticalCollision = movement.y != adjustedMovement.y;
+        boolean groundCollision = verticalCollision && movement.y < 0.0;
+
+        self.horizontalCollision = horizontalCollision;
+        self.verticalCollision = verticalCollision;
+        self.groundCollision = groundCollision;
+
+        self.collidedSoftly = horizontalCollision && hasCollidedSoftly(adjustedMovement);
+
+        self.setOnGround(groundCollision, adjustedMovement);
+        BlockPos landingPos = self.getLandingPos();
+        BlockState landingBlockState = self.getWorld().getBlockState(landingPos);
+        fall(adjustedMovement.y, groundCollision, landingBlockState, landingPos);
+
+        if (self.isRemoved()) {
+            self.getWorld().getProfiler().pop();
+            return;
+        }
+
+        if (horizontalCollision) {
+            Vec3d currentVelocity = self.getVelocity();
+            self.setVelocity(horizontalCollision ? 0.0 : currentVelocity.x, currentVelocity.y, horizontalCollision ? 0.0 : currentVelocity.z);
+        }
+
+        Block block = landingBlockState.getBlock();
+        if (movement.y != adjustedMovement.y) {
+            block.onEntityLand(self.getWorld(), self);
+        }
+
+        if (groundCollision) {
+            block.onSteppedOn(self.getWorld(), landingPos, landingBlockState, self);
+        }
+
+        Entity.MoveEffect moveEffect = getMoveEffect();
+
+        if (moveEffect.hasAny() && !self.hasVehicle()) {
+            double xMovement = adjustedMovement.x;
+            double yMovement = adjustedMovement.y;
+            double zMovement = adjustedMovement.z;
+
+            self.speed += (float) (adjustedMovement.length() * 0.6);
+            BlockPos steppingPos = self.getSteppingPos();
+            BlockState steppingBlockState = self.getWorld().getBlockState(steppingPos);
+
+            if (!canClimb(steppingBlockState)) {
+                yMovement = 0.0;
+            }
+
+            self.horizontalSpeed += (float) (adjustedMovement.horizontalLength() * 0.6F);
+            self.distanceTraveled += (float) (Math.sqrt(xMovement * xMovement + yMovement * yMovement + zMovement * zMovement) * 0.6F);
+
+            if (self.distanceTraveled > nextStepSoundDistance && !steppingBlockState.isAir()) {
+                boolean sameBlockPos = steppingPos.equals(landingPos);
+                boolean stepSoundPlayed = stepOnBlock(landingPos, landingBlockState, moveEffect.playsSounds(), sameBlockPos, movement);
+
+                if (!sameBlockPos) {
+                    stepSoundPlayed |= stepOnBlock(steppingPos, steppingBlockState, false, moveEffect.emitsGameEvents(), movement);
+                }
+
+                if (stepSoundPlayed) {
+                    nextStepSoundDistance = calculateNextStepSoundDistance();
+                } else if (self.isTouchingWater()) {
+                    nextStepSoundDistance = calculateNextStepSoundDistance();
+                    if (moveEffect.playsSounds()) {
+                        playSwimSound();
+                    }
+                    if (moveEffect.emitsGameEvents()) {
+                        self.emitGameEvent(GameEvent.SWIM);
+                    }
+                }
+            } else if (steppingBlockState.isAir()) {
+                addAirTravelEffects();
+            }
+        }
+
+        tryCheckBlockCollision();
+        float velocityMultiplier = getVelocityMultiplier();
+        self.setVelocity(self.getVelocity().multiply(velocityMultiplier, 1.0, velocityMultiplier));
+
+        if (self.getWorld()
+                .getStatesInBoxIfLoaded(self.getBoundingBox().contract(1.0E-6))
+                .noneMatch(state -> state.isIn(BlockTags.FIRE) || state.isOf(Blocks.LAVA))) {
+            if (fireTicks <= 0) {
+                self.setFireTicks(-getBurningDuration());
+            }
+            if (self.wasOnFire && (self.inPowderSnow || self.isWet())) {
+                playExtinguishSound();
+            }
+        }
+
+        if (self.isOnFire() && (self.inPowderSnow || self.isWet())) {
+            self.setFireTicks(-getBurningDuration());
+        }
+
+        self.getWorld().getProfiler().pop();
     }
 
     @Unique
     protected BlockPos getPosWithYOffsetCustom(float offset) {
         Entity self = (Entity) (Object) this;
-        if (self.supportingBlockPos.isPresent()) {
-            BlockPos blockPos = (BlockPos)self.supportingBlockPos.get();
-            if (!(offset > 1.0E-5F)) {
+        Optional<BlockPos> supportingBlockPosOptional = self.supportingBlockPos;
+
+        if (supportingBlockPosOptional.isPresent()) {
+            BlockPos blockPos = supportingBlockPosOptional.get();
+
+            if (offset <= 1.0E-5F) {
                 return blockPos;
-            } else {
-                BlockState blockState = self.getWorld().getBlockState(blockPos);
-                return (!((double)offset <= 0.5) || !blockState.isIn(BlockTags.FENCES))
-                        && !blockState.isIn(BlockTags.WALLS)
-                        && !(blockState.getBlock() instanceof FenceGateBlock)
-                        ? blockPos.withY(MathHelper.floor(self.getPos().y - (double)offset))
-                        : blockPos;
             }
+
+            BlockState blockState = self.getWorld().getBlockState(blockPos);
+
+            if (offset > 0.5) {
+                return blockPos.withY(MathHelper.floor(self.getPos().y - (double) offset));
+            }
+
+            if (blockState.isIn(BlockTags.FENCES) || blockState.isIn(BlockTags.WALLS) || blockState.getBlock() instanceof FenceGateBlock) {
+                return blockPos;
+            }
+
+            return blockPos.withY(MathHelper.floor(self.getPos().y - (double) offset));
         } else {
-            int i = MathHelper.floor(self.getPos().x);
-            int j = MathHelper.floor(self.getPos().y - (double)offset);
-            int k = MathHelper.floor(self.getPos().z);
-            return new BlockPos(i, j, k);
+            double posX = self.getPos().x;
+            double posY = self.getPos().y - (double) offset;
+            double posZ = self.getPos().z;
+
+            return new BlockPos(MathHelper.floor(posX), MathHelper.floor(posY), MathHelper.floor(posZ));
         }
     }
 }
