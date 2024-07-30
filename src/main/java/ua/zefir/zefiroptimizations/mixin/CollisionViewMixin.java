@@ -45,7 +45,6 @@ public interface CollisionViewMixin {
         Vec3d entityPos = entity.getPos();
 
         // Iterate directly over BlockPos instead of using Spliterator for potential performance gain
-        // Assuming BlockCollisionSpliterator provides a way to access the iteration bounds
         int minX = (int) Math.floor(box.minX);
         int maxX = (int) Math.ceil(box.maxX);
         int minY = (int) Math.floor(box.minY);

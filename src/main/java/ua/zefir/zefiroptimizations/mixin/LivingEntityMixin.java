@@ -1,16 +1,23 @@
 package ua.zefir.zefiroptimizations.mixin;
 
+import com.google.common.base.Objects;
+import net.minecraft.block.Blocks;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.Flutterer;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MovementType;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.effect.StatusEffectUtil;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.FluidState;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.registry.tag.TagKey;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
@@ -18,17 +25,18 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.World;
+import net.minecraft.world.border.WorldBorder;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ua.zefir.zefiroptimizations.ThreadPoolManager;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+
+import static ua.zefir.zefiroptimizations.Commands.livingEntityOptimization;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin {
@@ -39,6 +47,8 @@ public abstract class LivingEntityMixin {
     @Shadow
     protected float prevScale;
     @Shadow
+    protected float prevLookDirection;;
+    @Shadow
     protected boolean jumping;
     @Shadow
     private int jumpingCooldown;
@@ -48,6 +58,10 @@ public abstract class LivingEntityMixin {
     protected int bodyTrackingIncrements;
     @Shadow
     protected int headTrackingIncrements;
+    @Shadow
+    protected int playerHitTimer;
+    @Shadow
+    private int lastAttackedTime;
     @Shadow
     protected int riptideTicks;
     @Shadow
@@ -63,11 +77,25 @@ public abstract class LivingEntityMixin {
     @Shadow
     protected double serverHeadYaw;
     @Shadow
+    protected PlayerEntity attackingPlayer;
+    @Shadow
+    private LivingEntity attacker;
+    @Shadow
+    private LivingEntity attacking;
+    @Shadow
+    private BlockPos lastBlockPos;
+    @Shadow
+    protected abstract SoundEvent getFallSound(int distance);
+    @Shadow
     protected abstract boolean isSleepingInBed();
     @Shadow
     protected abstract boolean isImmobile();
     @Shadow
     protected abstract boolean shouldSwimInFluids();
+    @Shadow
+    protected abstract int getNextAirUnderwater(int air);
+    @Shadow
+    protected abstract int getNextAirOnLand(int air);
     @Shadow
     protected abstract float getBaseMovementSpeedMultiplier();
     @Shadow
@@ -87,7 +115,11 @@ public abstract class LivingEntityMixin {
     @Shadow
     protected abstract void tickFallFlying();
     @Shadow
-    protected abstract SoundEvent getFallSound(int distance);
+    protected abstract void updatePostDeath();
+    @Shadow
+    protected abstract void tickStatusEffects();
+    @Shadow
+    protected abstract void applyMovementEffects(ServerWorld world, BlockPos pos);
     @Shadow
     protected abstract void tickRiptide(Box a, Box b);
     @Shadow
@@ -99,30 +131,144 @@ public abstract class LivingEntityMixin {
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;tick()V", shift = At.Shift.AFTER), cancellable = true)
     private void tick(CallbackInfo ci){
-//        if(isOptimizeVillagers) {
-        this.cutomTick();
-        ci.cancel();
-//        }
+        if(livingEntityOptimization) {
+            this.zefiroptimizations$cutomTick();
+            ci.cancel();
+        }
     }
 
     @Inject(method = "tickMovement", at = @At(value = "HEAD"), cancellable = true)
     private void tickMovement(CallbackInfo ci){
-//        if(isOptimizeVillagers) {
-        this.customTickMovement();
-        ci.cancel();
-//        }
+        if(livingEntityOptimization) {
+            this.zefiroptimizations$customTickMovement();
+            ci.cancel();
+        }
     }
 
     @Inject(method = "travel", at = @At(value = "HEAD"), cancellable = true)
     private void travel(Vec3d movementInput, CallbackInfo ci){
-//        if(isOptimizeVillagers) {
-        this.customTravel(movementInput);
-        ci.cancel();
-//        }
+        if(livingEntityOptimization) {
+            this.zefiroptimizations$customTravel(movementInput);
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "baseTick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;baseTick()V", shift = At.Shift.AFTER), cancellable = true)
+    private void baseTick(CallbackInfo ci){
+        if(livingEntityOptimization) {
+        this.zefiroptimizations$customBaseTick();
+            ci.cancel();
+        }
     }
 
     @Unique
-    public void customTickMovement() {
+    public void zefiroptimizations$customBaseTick() {
+        LivingEntity self = (LivingEntity) (Object) this;
+        World world = self.getWorld();
+
+        world.getProfiler().push("livingEntityBaseTick");
+
+        if (self.isAlive()) {
+            if (!world.isClient) {
+                if (self.isInsideWall()) {
+                    self.damage(self.getDamageSources().inWall(), 1.0F);
+                } else if (self instanceof PlayerEntity && !world.getWorldBorder().contains(self.getBoundingBox())) {
+                    WorldBorder worldBorder = world.getWorldBorder();
+                    double distanceInsideBorder = worldBorder.getDistanceInsideBorder(self);
+                    double safeZone = worldBorder.getSafeZone();
+                    double totalDistance = distanceInsideBorder + safeZone;
+
+                    if (totalDistance < 0.0) {
+                        double damagePerBlock = worldBorder.getDamagePerBlock();
+                        if (damagePerBlock > 0.0) {
+                            self.damage(self.getDamageSources().outsideBorder(), (float) Math.max(1, MathHelper.floor(-totalDistance * damagePerBlock)));
+                        }
+                    }
+                }
+            }
+
+            BlockPos blockPos = BlockPos.ofFloored(self.getX(), self.getEyeY(), self.getZ());
+            boolean inWater = self.isSubmergedIn(FluidTags.WATER) && !world.getBlockState(blockPos).isOf(Blocks.BUBBLE_COLUMN);
+
+            if (inWater) {
+                if (!self.isFireImmune()) {
+                    self.extinguish();
+                }
+                handleUnderwater(self);
+            } else {
+                if (self.isWet() || self.inPowderSnow) {
+                    self.extinguishWithSound();
+                }
+                if (self.getAir() < self.getMaxAir()) {
+                    self.setAir(this.getNextAirOnLand(self.getAir()));
+                }
+            }
+
+            if (world instanceof ServerWorld serverWorld) {
+                BlockPos currentBlockPos = self.getBlockPos();
+                if (!Objects.equal(this.lastBlockPos, currentBlockPos)) {
+                    this.lastBlockPos = currentBlockPos;
+                    this.applyMovementEffects(serverWorld, currentBlockPos);
+                }
+            }
+        } else if (world.shouldUpdatePostDeath(self)) {
+            this.updatePostDeath();
+        }
+
+        if (self.hurtTime > 0) {
+            self.hurtTime--;
+        }
+        if (self.timeUntilRegen > 0 && !(self instanceof ServerPlayerEntity)) {
+            self.timeUntilRegen--;
+        }
+        if (this.playerHitTimer > 0) {
+            this.playerHitTimer--;
+        } else {
+            this.attackingPlayer = null;
+        }
+
+        if ((this.attacking != null && !this.attacking.isAlive()) || (this.attacker != null && (!this.attacker.isAlive() || self.age - this.lastAttackedTime > 100))) {
+            this.attacking = null;
+            self.setAttacker(null);
+        }
+
+        this.tickStatusEffects();
+        this.prevLookDirection = this.lookDirection;
+        self.prevBodyYaw = self.bodyYaw;
+        self.prevHeadYaw = self.headYaw;
+        self.prevYaw = self.getYaw();
+        self.prevPitch = self.getPitch();
+        world.getProfiler().pop();
+    }
+
+    @Unique
+    private void handleUnderwater(LivingEntity self) {
+        World world = self.getWorld();
+        if (!world.isClient) {
+            boolean shouldDrown = !self.canBreatheInWater() && !StatusEffectUtil.hasWaterBreathing(self) && (!(self instanceof PlayerEntity) || !((PlayerEntity) self).getAbilities().invulnerable);
+            if (shouldDrown) {
+                self.setAir(this.getNextAirUnderwater(self.getAir()));
+                if (self.getAir() == -20) {
+                    self.setAir(0);
+                    Vec3d vec3d = self.getVelocity();
+                    for (int i = 0; i < 8; i++) {
+                        double f = self.getRandom().nextDouble() - self.getRandom().nextDouble();
+                        double g = self.getRandom().nextDouble() - self.getRandom().nextDouble();
+                        double h = self.getRandom().nextDouble() - self.getRandom().nextDouble();
+                        world.addParticle(ParticleTypes.BUBBLE, self.getX() + f, self.getY() + g, self.getZ() + h, vec3d.x, vec3d.y, vec3d.z);
+                    }
+                    self.damage(self.getDamageSources().drown(), 2.0F);
+                }
+            }
+
+            if (self.hasVehicle() && self.getVehicle() != null && self.getVehicle().shouldDismountUnderwater()) {
+                self.stopRiding();
+            }
+        }
+    }
+
+    @Unique
+    public void zefiroptimizations$customTickMovement() {
         LivingEntity self = (LivingEntity) (Object) this;
         if (jumpingCooldown > 0) {
             jumpingCooldown--;
@@ -227,7 +373,7 @@ public abstract class LivingEntityMixin {
     }
 
     @Unique
-    public void customTravel(Vec3d movementInput) {
+    public void zefiroptimizations$customTravel(Vec3d movementInput) {
         LivingEntity self = (LivingEntity) (Object) this;
 
         if (!self.isLogicalSideForUpdatingMovement()) {
@@ -386,7 +532,7 @@ public abstract class LivingEntityMixin {
     }
 
     @Unique
-    public void cutomTick() {
+    public void zefiroptimizations$cutomTick() {
         LivingEntity self = (LivingEntity) (Object) this;
         this.tickActiveItemStack();
         this.updateLeaningPitch();

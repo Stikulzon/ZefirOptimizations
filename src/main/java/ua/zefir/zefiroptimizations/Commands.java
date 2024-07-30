@@ -6,7 +6,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
 import java.util.Objects;
-
+// Успішні оптимізації - isOptimizeVillagers, collisionViewOptimization
 public class Commands {
     public static boolean isOptimizeVillagers = false;
     public static boolean isOptimizeVillagers1 = false;
@@ -14,6 +14,7 @@ public class Commands {
     public static boolean entityOptimizations2 = false;
     public static boolean collisionViewOptimization = false;
     public static boolean customComputeNextOptimization = false;
+    public static boolean livingEntityOptimization = true;
     public static void registerCommands() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(CommandManager.literal("villagers_switch")
@@ -28,14 +29,22 @@ public class Commands {
                     .executes(context -> collisionViewOptimization(Objects.requireNonNull(context.getSource().getPlayer()))));
             dispatcher.register(CommandManager.literal("customComputeNextOptimization")
                     .executes(context -> customComputeNextOptimization(Objects.requireNonNull(context.getSource().getPlayer()))));
+            dispatcher.register(CommandManager.literal("livingEntityOptimization")
+                    .executes(context -> livingEntityOptimization(Objects.requireNonNull(context.getSource().getPlayer()))));
         });
     }
 
+    private static int livingEntityOptimization(ServerPlayerEntity player){
+        livingEntityOptimization = !livingEntityOptimization;
+        player.sendMessage(Text.literal("livingEntityOptimization is now " + livingEntityOptimization), false);
+        return 1;
+    }
     private static int customComputeNextOptimization(ServerPlayerEntity player){
         customComputeNextOptimization = !customComputeNextOptimization;
         player.sendMessage(Text.literal("customComputeNextOptimization is now " + customComputeNextOptimization), false);
         return 1;
-    }private static int entityOptimizations1(ServerPlayerEntity player){
+    }
+    private static int entityOptimizations1(ServerPlayerEntity player){
         entityOptimizations1 = !entityOptimizations1;
         player.sendMessage(Text.literal("entityOptimizations1 is now " + entityOptimizations1), false);
         return 1;
