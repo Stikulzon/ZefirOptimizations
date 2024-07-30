@@ -90,134 +90,195 @@ public abstract class EntityMixin {
     public void customMove(MovementType movementType, Vec3d movement) {
         Entity self = (Entity) (Object) this;
         if (self.noClip) {
-            self.setPosition(self.getX() + movement.x, self.getY() + movement.y, self.getZ() + movement.z);
+            moveWithoutCollision(self, movement);
         } else {
-            self.wasOnFire = self.isOnFire();
-            if (movementType == MovementType.PISTON) {
-                movement = this.adjustMovementForPiston(movement);
-                if (movement.equals(Vec3d.ZERO)) {
-                    return;
-                }
+            handleCollisionMovement(self, movementType, movement);
+        }
+    }
+
+    @Unique
+    private void moveWithoutCollision(Entity self, Vec3d movement) {
+        self.setPosition(self.getX() + movement.x, self.getY() + movement.y, self.getZ() + movement.z);
+    }
+
+    @Unique
+    private void handleCollisionMovement(Entity self, MovementType movementType, Vec3d movement) {
+        self.wasOnFire = self.isOnFire();
+        if (movementType == MovementType.PISTON) {
+            movement = adjustMovementForPiston(movement);
+            if (movement.equals(Vec3d.ZERO)) {
+                return;
+            }
+        }
+
+        self.getWorld().getProfiler().push("move");
+        movement = applyMovementMultiplier(self, movement);
+
+        movement = this.adjustMovementForSneaking(movement, movementType);
+        Vec3d vec3d = zefiroptimizations$customAdjustMovementForCollisions(movement);
+
+        if (vec3d.lengthSquared() > 1.0E-7) {
+            handleMovementCollision(self, vec3d);
+        }
+
+        self.getWorld().getProfiler().pop();
+        self.getWorld().getProfiler().push("rest");
+
+        updateCollisionFlags(self, movement, vec3d);
+        handleGroundCollision(self, vec3d);
+        handleBlockInteractions(self, movement, vec3d);
+        handleMovementEffects(self, vec3d);
+
+        handleFireAndBurning(self);
+
+        self.getWorld().getProfiler().pop();
+    }
+
+    @Unique
+    private void handleMovementCollision(Entity self, Vec3d adjustedMovement) {
+        double d = adjustedMovement.lengthSquared();
+        if (self.fallDistance != 0.0F && d >= 1.0) {
+            resetFallDistanceOnCollision(self, adjustedMovement);
+        }
+
+        self.setPosition(self.getX() + adjustedMovement.x, self.getY() + adjustedMovement.y, self.getZ() + adjustedMovement.z);
+    }
+
+    @Unique
+    private void updateCollisionFlags(Entity self, Vec3d movement, Vec3d adjustedMovement) {
+        boolean bl = !MathHelper.approximatelyEquals(movement.x, adjustedMovement.x);
+        boolean bl2 = !MathHelper.approximatelyEquals(movement.z, adjustedMovement.z);
+        self.horizontalCollision = bl || bl2;
+        self.verticalCollision = movement.y != adjustedMovement.y;
+        self.groundCollision = self.verticalCollision && movement.y < 0.0;
+        self.collidedSoftly = self.horizontalCollision && hasCollidedSoftly(adjustedMovement);
+    }
+
+    @Unique
+    private void handleGroundCollision(Entity self, Vec3d adjustedMovement) {
+        self.setOnGround(self.groundCollision, adjustedMovement);
+        BlockPos blockPos = self.getLandingPos();
+        BlockState blockState = self.getWorld().getBlockState(blockPos);
+        this.fall(adjustedMovement.y, self.isOnGround(), blockState, blockPos);
+    }
+
+    @Unique
+    private void handleBlockInteractions(Entity self, Vec3d movement, Vec3d adjustedMovement) {
+        if (self.isRemoved()) {
+            return;
+        }
+
+        if (self.horizontalCollision) {
+            Vec3d vec3d2 = self.getVelocity();
+            self.setVelocity(movement.x != adjustedMovement.x ? 0.0 : vec3d2.x, vec3d2.y, movement.z != adjustedMovement.z ? 0.0 : vec3d2.z);
+        }
+
+        BlockPos blockPos = self.getLandingPos();
+        BlockState blockState = self.getWorld().getBlockState(blockPos);
+        if (movement.y != adjustedMovement.y) {
+            blockState.getBlock().onEntityLand(self.getWorld(), self);
+        }
+
+        if (self.isOnGround() && !self.isRemoved()) {
+            blockState.getBlock().onSteppedOn(self.getWorld(), blockPos, blockState, self);
+        }
+    }
+
+    @Unique
+    private void handleMovementEffects(Entity self, Vec3d adjustedMovement) {
+        Entity.MoveEffect moveEffect = this.getMoveEffect();
+        if (!moveEffect.hasAny() || self.hasVehicle()) {
+            return;
+        }
+
+        double e = adjustedMovement.x;
+        double f = adjustedMovement.y;
+        double g = adjustedMovement.z;
+        self.speed = self.speed + (float)(adjustedMovement.length() * 0.6);
+        BlockPos blockPos2 = self.getSteppingPos();
+        BlockState blockState2 = self.getWorld().getBlockState(blockPos2);
+
+        if (!this.canClimb(blockState2)) {
+            f = 0.0;
+        }
+
+        self.horizontalSpeed = self.horizontalSpeed + (float)adjustedMovement.horizontalLength() * 0.6F;
+        self.distanceTraveled = self.distanceTraveled + (float)Math.sqrt(e * e + f * f + g * g) * 0.6F;
+
+        handleStepSoundsAndEvents(self, blockState2, adjustedMovement, moveEffect);
+        if (blockState2.isAir()) {
+            this.addAirTravelEffects();
+        }
+    }
+
+    @Unique
+    private void handleStepSoundsAndEvents(Entity self, BlockState blockState, Vec3d adjustedMovement, Entity.MoveEffect moveEffect) {
+        if (self.distanceTraveled <= this.nextStepSoundDistance || blockState.isAir()) {
+            return;
+        }
+
+        BlockPos blockPos = self.getLandingPos();
+        BlockPos blockPos2 = self.getSteppingPos();
+        boolean bl4 = blockPos2.equals(blockPos);
+        boolean bl5 = this.stepOnBlock(blockPos, self.getWorld().getBlockState(blockPos), moveEffect.playsSounds(), bl4, adjustedMovement);
+        if (!bl4) {
+            bl5 |= this.stepOnBlock(blockPos2, blockState, false, moveEffect.emitsGameEvents(), adjustedMovement);
+        }
+
+        if (bl5) {
+            this.nextStepSoundDistance = this.calculateNextStepSoundDistance();
+        } else if (self.isTouchingWater()) {
+            this.nextStepSoundDistance = this.calculateNextStepSoundDistance();
+            if (moveEffect.playsSounds()) {
+                this.playSwimSound();
             }
 
-            self.getWorld().getProfiler().push("move");
-            if (this.movementMultiplier.lengthSquared() > 1.0E-7) {
-                movement = movement.multiply(this.movementMultiplier);
-                this.movementMultiplier = Vec3d.ZERO;
-                self.setVelocity(Vec3d.ZERO);
+            if (moveEffect.emitsGameEvents()) {
+                self.emitGameEvent(GameEvent.SWIM);
+            }
+        }
+    }
+
+    @Unique
+    private Vec3d applyMovementMultiplier(Entity self, Vec3d movement) {
+        if (this.movementMultiplier.lengthSquared() > 1.0E-7) {
+            movement = movement.multiply(this.movementMultiplier);
+            this.movementMultiplier = Vec3d.ZERO;
+            self.setVelocity(Vec3d.ZERO);
+        }
+        return movement;
+    }
+
+    @Unique
+    private void resetFallDistanceOnCollision(Entity self, Vec3d adjustedMovement) {
+        BlockHitResult blockHitResult = self.getWorld()
+                .raycast(
+                        new RaycastContext(self.getPos(), self.getPos().add(adjustedMovement), RaycastContext.ShapeType.FALLDAMAGE_RESETTING, RaycastContext.FluidHandling.WATER, self)
+                );
+        if (blockHitResult.getType() != HitResult.Type.MISS) {
+            self.onLanding();
+        }
+    }
+
+    @Unique
+    private void handleFireAndBurning(Entity self) {
+        this.tryCheckBlockCollision();
+        float h = this.getVelocityMultiplier();
+        self.setVelocity(self.getVelocity().multiply(h, 1.0, h));
+        if (self.getWorld()
+                .getStatesInBoxIfLoaded(self.getBoundingBox().contract(1.0E-6))
+                .noneMatch(state -> state.isIn(BlockTags.FIRE) || state.isOf(Blocks.LAVA))) {
+            if (this.fireTicks <= 0) {
+                self.setFireTicks(-this.getBurningDuration());
             }
 
-            movement = this.adjustMovementForSneaking(movement, movementType);
-            Vec3d vec3d = zefiroptimizations$customAdjustMovementForCollisions(movement);
-            double d = vec3d.lengthSquared();
-            if (d > 1.0E-7) {
-                if (self.fallDistance != 0.0F && d >= 1.0) {
-                    BlockHitResult blockHitResult = self.getWorld()
-                            .raycast(
-                                    new RaycastContext(self.getPos(), self.getPos().add(vec3d), RaycastContext.ShapeType.FALLDAMAGE_RESETTING, RaycastContext.FluidHandling.WATER, self)
-                            );
-                    if (blockHitResult.getType() != HitResult.Type.MISS) {
-                        self.onLanding();
-                    }
-                }
-
-                self.setPosition(self.getX() + vec3d.x, self.getY() + vec3d.y, self.getZ() + vec3d.z);
+            if (self.wasOnFire && (self.inPowderSnow || self.isWet())) {
+                this.playExtinguishSound();
             }
+        }
 
-            self.getWorld().getProfiler().pop();
-            self.getWorld().getProfiler().push("rest");
-            boolean bl = !MathHelper.approximatelyEquals(movement.x, vec3d.x);
-            boolean bl2 = !MathHelper.approximatelyEquals(movement.z, vec3d.z);
-            self.horizontalCollision = bl || bl2;
-            self.verticalCollision = movement.y != vec3d.y;
-            self.groundCollision = self.verticalCollision && movement.y < 0.0;
-            if (self.horizontalCollision) {
-                self.collidedSoftly = this.hasCollidedSoftly(vec3d);
-            } else {
-                self.collidedSoftly = false;
-            }
-
-            self.setOnGround(self.groundCollision, vec3d);
-            BlockPos blockPos = self.getLandingPos();
-            BlockState blockState = self.getWorld().getBlockState(blockPos);
-            this.fall(vec3d.y, self.isOnGround(), blockState, blockPos);
-            if (self.isRemoved()) {
-                self.getWorld().getProfiler().pop();
-            } else {
-                if (self.horizontalCollision) {
-                    Vec3d vec3d2 = self.getVelocity();
-                    self.setVelocity(bl ? 0.0 : vec3d2.x, vec3d2.y, bl2 ? 0.0 : vec3d2.z);
-                }
-
-                Block block = blockState.getBlock();
-                if (movement.y != vec3d.y) {
-                    block.onEntityLand(self.getWorld(), self);
-                }
-
-                if (self.isOnGround()) {
-                    block.onSteppedOn(self.getWorld(), blockPos, blockState, self);
-                }
-
-                Entity.MoveEffect moveEffect = this.getMoveEffect();
-                if (moveEffect.hasAny() && !self.hasVehicle()) {
-                    double e = vec3d.x;
-                    double f = vec3d.y;
-                    double g = vec3d.z;
-                    self.speed = self.speed + (float)(vec3d.length() * 0.6);
-                    BlockPos blockPos2 = self.getSteppingPos();
-                    BlockState blockState2 = self.getWorld().getBlockState(blockPos2);
-                    boolean bl3 = this.canClimb(blockState2);
-                    if (!bl3) {
-                        f = 0.0;
-                    }
-
-                    self.horizontalSpeed = self.horizontalSpeed + (float)vec3d.horizontalLength() * 0.6F;
-                    self.distanceTraveled = self.distanceTraveled + (float)Math.sqrt(e * e + f * f + g * g) * 0.6F;
-                    if (self.distanceTraveled > this.nextStepSoundDistance && !blockState2.isAir()) {
-                        boolean bl4 = blockPos2.equals(blockPos);
-                        boolean bl5 = this.stepOnBlock(blockPos, blockState, moveEffect.playsSounds(), bl4, movement);
-                        if (!bl4) {
-                            bl5 |= this.stepOnBlock(blockPos2, blockState2, false, moveEffect.emitsGameEvents(), movement);
-                        }
-
-                        if (bl5) {
-                            this.nextStepSoundDistance = this.calculateNextStepSoundDistance();
-                        } else if (self.isTouchingWater()) {
-                            this.nextStepSoundDistance = this.calculateNextStepSoundDistance();
-                            if (moveEffect.playsSounds()) {
-                                this.playSwimSound();
-                            }
-
-                            if (moveEffect.emitsGameEvents()) {
-                                self.emitGameEvent(GameEvent.SWIM);
-                            }
-                        }
-                    } else if (blockState2.isAir()) {
-                        this.addAirTravelEffects();
-                    }
-                }
-
-                this.tryCheckBlockCollision();
-                float h = this.getVelocityMultiplier();
-                self.setVelocity(self.getVelocity().multiply(h, 1.0, h));
-                if (self.getWorld()
-                        .getStatesInBoxIfLoaded(self.getBoundingBox().contract(1.0E-6))
-                        .noneMatch(state -> state.isIn(BlockTags.FIRE) || state.isOf(Blocks.LAVA))) {
-                    if (this.fireTicks <= 0) {
-                        self.setFireTicks(-this.getBurningDuration());
-                    }
-
-                    if (self.wasOnFire && (self.inPowderSnow || self.isWet())) {
-                        this.playExtinguishSound();
-                    }
-                }
-
-                if (self.isOnFire() && (self.inPowderSnow || self.isWet())) {
-                    self.setFireTicks(-this.getBurningDuration());
-                }
-
-                self.getWorld().getProfiler().pop();
-            }
+        if (self.isOnFire() && (self.inPowderSnow || self.isWet())) {
+            self.setFireTicks(-this.getBurningDuration());
         }
     }
 
