@@ -6,7 +6,7 @@
     "BlockCollisionSpliteratorMixin",
     "CollisionViewMixin",
     "EntityMixin",
-    "EntityMoveMixin",
+    "EntityMixin1",
     "LivingEntityMixin",
     "WorkStationCompetitionTaskMixin"
   ],

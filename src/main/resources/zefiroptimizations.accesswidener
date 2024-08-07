@@ -1,10 +1,1 @@
 accessWidener v2 named
-
-accessible field net/minecraft/util/shape/ArrayVoxelShape xPoints Lit/unimi/dsi/fastutil/doubles/DoubleList;
-accessible field net/minecraft/util/shape/ArrayVoxelShape yPoints Lit/unimi/dsi/fastutil/doubles/DoubleList;
-accessible field net/minecraft/util/shape/ArrayVoxelShape zPoints Lit/unimi/dsi/fastutil/doubles/DoubleList;
-accessible field net/minecraft/util/shape/OffsetDoubleList offset D
-
-accessible method net/minecraft/entity/Entity lerpPosAndRotation (IDDDDD)V
-accessible field net/minecraft/entity/Entity FALL_FLYING_FLAG_INDEX I
-accessible method net/minecraft/entity/Entity setFlag (IZ)V

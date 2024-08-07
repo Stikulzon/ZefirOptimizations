@@ -1,69 +1,39 @@
 package ua.zefir.zefiroptimizations.mixin;
 
-import com.google.common.base.Objects;
-import net.minecraft.block.Blocks;
-import net.minecraft.enchantment.EnchantmentHelper;
+import akka.actor.ActorRef;
+import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.Flutterer;
+import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MovementType;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.effect.StatusEffectUtil;
-import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.item.ItemStack;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.World;
-import net.minecraft.world.border.WorldBorder;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-
-import static ua.zefir.zefiroptimizations.Commands.livingEntityOptimization;
+import ua.zefir.zefiroptimizations.ZefirOptimizations;
+import ua.zefir.zefiroptimizations.actors.*;
 
 @Mixin(LivingEntity.class)
-public abstract class LivingEntityMixin {
-    @Shadow
-    protected float lookDirection;
-    @Shadow
-    protected float stepBobbingAmount;
-    @Shadow
-    protected float prevScale;
-    @Shadow
-    protected float prevLookDirection;;
-    @Shadow
-    protected boolean jumping;
+public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTickingLivingEntity, IAsyncLivingEntityAccess {
     @Shadow
     private int jumpingCooldown;
     @Shadow
-    protected int fallFlyingTicks;
+    protected boolean jumping;
+    @Shadow
+    private float movementSpeed;
     @Shadow
     protected int bodyTrackingIncrements;
-    @Shadow
-    protected int headTrackingIncrements;
-    @Shadow
-    protected int playerHitTimer;
-    @Shadow
-    private int lastAttackedTime;
-    @Shadow
-    protected int riptideTicks;
     @Shadow
     protected double serverX;
     @Shadow
@@ -75,646 +45,468 @@ public abstract class LivingEntityMixin {
     @Shadow
     protected double serverPitch;
     @Shadow
+    protected int headTrackingIncrements;
+    @Shadow
     protected double serverHeadYaw;
     @Shadow
-    protected PlayerEntity attackingPlayer;
+    protected float lookDirection;
     @Shadow
-    private LivingEntity attacker;
+    protected float prevLookDirection;
     @Shadow
-    private LivingEntity attacking;
+    protected float stepBobbingAmount;
     @Shadow
-    private BlockPos lastBlockPos;
+    protected float prevStepBobbingAmount;
+    @Shadow
+    protected int fallFlyingTicks;
+    @Shadow
+    protected ItemStack activeItemStack;
+    @Shadow
+    protected int itemUseTimeLeft;
+    @Shadow
+    protected int riptideTicks;
+    @Shadow
+    protected static final int USING_RIPTIDE_FLAG = 4;
+    @Shadow
+    protected float riptideAttackDamage;
+    @Shadow
+    protected ItemStack riptideStack;
+
     @Shadow
     protected abstract SoundEvent getFallSound(int distance);
     @Shadow
-    protected abstract boolean isSleepingInBed();
-    @Shadow
-    protected abstract boolean isImmobile();
+    protected abstract float getJumpVelocity();
     @Shadow
     protected abstract boolean shouldSwimInFluids();
     @Shadow
-    protected abstract int getNextAirUnderwater(int air);
+    protected abstract void setLivingFlag(int mask, boolean value);
     @Shadow
-    protected abstract int getNextAirOnLand(int air);
+    protected abstract Vec3d getControlledMovementInput(PlayerEntity controllingPlayer, Vec3d movementInput);
     @Shadow
-    protected abstract float getBaseMovementSpeedMultiplier();
+    protected abstract float getSaddledSpeed(PlayerEntity controllingPlayer);
     @Shadow
-    protected abstract float turnHead(float bodyRotation, float headRotation);
+    protected abstract void attackLivingEntity(LivingEntity target);
     @Shadow
-    protected abstract void tickActiveItemStack();
+    protected abstract void fall(double heightDifference, boolean onGround, BlockState state, BlockPos landedPosition);
     @Shadow
-    protected abstract void updateLeaningPitch();
+    protected abstract float getVelocityMultiplier();
+    @Shadow
+    protected abstract void tickControlled(PlayerEntity controllingPlayer, Vec3d movementInput);
     @Shadow
     protected abstract void tickNewAi();
     @Shadow
-    protected abstract void addPowderSnowSlowIfNeeded();
+    protected abstract float getBaseMovementSpeedMultiplier();
     @Shadow
-    protected abstract void removePowderSnowSlow();
-    @Shadow
-    protected abstract void tickCramming();
-    @Shadow
-    protected abstract void tickFallFlying();
-    @Shadow
-    protected abstract void updatePostDeath();
-    @Shadow
-    protected abstract void tickStatusEffects();
-    @Shadow
-    protected abstract void applyMovementEffects(ServerWorld world, BlockPos pos);
-    @Shadow
-    protected abstract void tickRiptide(Box a, Box b);
-    @Shadow
-    protected abstract void swimUpward(TagKey<Fluid> fluid);
-    @Shadow
-    protected abstract void travelControlled(PlayerEntity controllingPlayer, Vec3d movementInput);
-    @Shadow
-    protected abstract void lerpHeadYaw(int headTrackingIncrements, double serverHeadYaw);
+    protected abstract void pushAway(Entity entity);
 
-    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;tick()V", shift = At.Shift.AFTER), cancellable = true)
-    private void tick(CallbackInfo ci){
-        if(livingEntityOptimization) {
-            this.zefiroptimizations$cutomTick();
-            ci.cancel();
-        }
+    @Override
+    public boolean zefiroptimizations$shouldSwimInFluids() {
+                return this.shouldSwimInFluids();
+            }
+
+            @Override
+    public boolean zefiroptimizations$isTouchingWater() {
+                return touchingWater;
+            }
+
+            @Override
+    public SoundEvent zefiroptimizations$getFallSound(int distance) {
+                return this.getFallSound(distance);
+            }
+
+            @Override
+    public float zefiroptimizations$getJumpVelocity() {
+                return this.getJumpVelocity();
+            }
+
+    @Override
+    public float zefiroptimizations$getBaseMovementSpeedMultiplier() {
+        return getBaseMovementSpeedMultiplier();
     }
 
-    @Inject(method = "tickMovement", at = @At(value = "HEAD"), cancellable = true)
-    private void tickMovement(CallbackInfo ci){
-        if(livingEntityOptimization) {
-            this.zefiroptimizations$customTickMovement();
-            ci.cancel();
-        }
+    @Override
+    public Vec3d zefiroptimizations$getControlledMovementInput(PlayerEntity controllingPlayer, Vec3d movementInput) {
+        return this.getControlledMovementInput(controllingPlayer, movementInput);
     }
 
-    @Inject(method = "travel", at = @At(value = "HEAD"), cancellable = true)
-    private void travel(Vec3d movementInput, CallbackInfo ci){
-        if(livingEntityOptimization) {
-            this.zefiroptimizations$customTravel(movementInput);
-            ci.cancel();
-        }
+    @Override
+    public int zefiroptimizations$getBurningDuration() {
+        return getBurningDuration();
     }
 
-    @Inject(method = "baseTick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;baseTick()V", shift = At.Shift.AFTER), cancellable = true)
-    private void baseTick(CallbackInfo ci){
-        if(livingEntityOptimization) {
-        this.zefiroptimizations$customBaseTick();
-            ci.cancel();
-        }
+    @Override
+    public void zefiroptimizations$setLivingFlag(int mask, boolean value) {
+        this.setLivingFlag(mask, value);
+    }
+
+    @Override
+    public float zefiroptimizations$getSaddledSpeed(PlayerEntity controllingPlayer) {
+        return this.getSaddledSpeed(controllingPlayer);
+    }
+
+    @Override
+    public void zefiroptimizations$attackLivingEntity(LivingEntity target) {
+        this.attackLivingEntity(target);
+    }
+
+    @Override
+    public void zefiroptimizations$fall(double heightDifference, boolean onGround, BlockState state, BlockPos landedPosition) {
+        this.fall(heightDifference, onGround, state, landedPosition);
+    }
+
+    @Override
+    public float zefiroptimizations$getVelocityMultiplier() {
+        return this.getVelocityMultiplier();
+    }
+
+    @Override
+    public void zefiroptimizations$tickControlled(PlayerEntity controllingPlayer, Vec3d movementInput) {
+        this.tickControlled(controllingPlayer, movementInput);
+    }
+
+    @Override
+    public void zefiroptimizations$tickNewAi() {
+        this.tickNewAi();
+    }
+
+    @Override
+    public boolean zefiroptimizations$hasCollidedSoftly(Vec3d adjustedMovement) {
+        return this.hasCollidedSoftly(adjustedMovement);
+    }
+
+    @Override
+    public void zefiroptimizations$pushAway(Entity entity) {
+        this.pushAway(entity);
+    }
+
+
+    @Override
+    public int zefiroptimizations$getJumpingCooldown() {
+        return jumpingCooldown;
+    }
+
+    @Override
+    public int zefiroptimizations$getRiptideTicks() {
+        return riptideTicks;
+    }
+
+    @Override
+    public void zefiroptimizations$setRiptideTicks(int ticks) {
+        riptideTicks = ticks;
+    }
+
+    @Override
+    public void zefiroptimizations$setRiptideAttackDamage(float damage) {
+        riptideAttackDamage = damage;
+    }
+
+    @Override
+    public float zefiroptimizations$getRiptideAttackDamage() {
+        return riptideAttackDamage;
+    }
+
+    @Override
+    public void zefiroptimizations$setRiptideStack(ItemStack stack) {
+        riptideStack = stack;
+    }
+
+    @Override
+    public void zefiroptimizations$setJumpingCooldown(int jumpingCooldown) {
+        this.jumpingCooldown = jumpingCooldown;
+    }
+
+    @Override
+    public boolean zefiroptimizations$isJumping() {
+        return jumping;
+    }
+
+    @Override
+    public void zefiroptimizations$setJumping(boolean jumping) {
+        this.jumping = jumping;
+    }
+
+    @Override
+    public float zefiroptimizations$getMovementSpeed() {
+        return movementSpeed;
+    }
+
+    @Override
+    public void zefiroptimizations$setMovementSpeed(float movementSpeed) {
+        this.movementSpeed = movementSpeed;
+    }
+
+    @Override
+    public int zefiroptimizations$getBodyTrackingIncrements() {
+        return bodyTrackingIncrements;
+    }
+
+    @Override
+    public void zefiroptimizations$setBodyTrackingIncrements(int bodyTrackingIncrements) {
+        this.bodyTrackingIncrements = bodyTrackingIncrements;
+    }
+
+    @Override
+    public double zefiroptimizations$getServerX() {
+        return serverX;
+    }
+
+    @Override
+    public void zefiroptimizations$setServerX(double serverX) {
+        this.serverX = serverX;
+    }
+
+    @Override
+    public double zefiroptimizations$getServerY() {
+        return serverY;
+    }
+
+    @Override
+    public void zefiroptimizations$setServerY(double serverY) {
+        this.serverY = serverY;
+    }
+
+    @Override
+    public double zefiroptimizations$getServerZ() {
+        return serverZ;
+    }
+
+    @Override
+    public void zefiroptimizations$setServerZ(double serverZ) {
+        this.serverZ = serverZ;
+    }
+
+    @Override
+    public double zefiroptimizations$getServerYaw() {
+        return serverYaw;
+    }
+
+    @Override
+    public void zefiroptimizations$setServerYaw(double serverYaw) {
+        this.serverYaw = serverYaw;
+    }
+
+    @Override
+    public double zefiroptimizations$getServerPitch() {
+        return serverPitch;
+    }
+
+    @Override
+    public void zefiroptimizations$setServerPitch(double serverPitch) {
+        this.serverPitch = serverPitch;
+    }
+
+    @Override
+    public int zefiroptimizations$getHeadTrackingIncrements() {
+        return headTrackingIncrements;
+    }
+
+    @Override
+    public void zefiroptimizations$setHeadTrackingIncrements(int headTrackingIncrements) {
+        this.headTrackingIncrements = headTrackingIncrements;
+    }
+
+    @Override
+    public double zefiroptimizations$getServerHeadYaw() {
+        return serverHeadYaw;
+    }
+
+    @Override
+    public void zefiroptimizations$setServerHeadYaw(double serverHeadYaw) {
+        this.serverHeadYaw = serverHeadYaw;
+    }
+
+    @Override
+    public float zefiroptimizations$getLookDirection() {
+        return lookDirection;
+    }
+
+    @Override
+    public void zefiroptimizations$setLookDirection(float lookDirection) {
+        this.lookDirection = lookDirection;
+    }
+
+    @Override
+    public float zefiroptimizations$getPrevLookDirection() {
+        return prevLookDirection;
+    }
+
+    @Override
+    public void zefiroptimizations$setPrevLookDirection(float prevLookDirection) {
+        this.prevLookDirection = prevLookDirection;
+    }
+
+    @Override
+    public float zefiroptimizations$getStepBobbingAmount() {
+        return stepBobbingAmount;
+    }
+
+    @Override
+    public void zefiroptimizations$setStepBobbingAmount(float stepBobbingAmount) {
+        this.stepBobbingAmount = stepBobbingAmount;
+    }
+
+    @Override
+    public float zefiroptimizations$getPrevStepBobbingAmount() {
+        return prevStepBobbingAmount;
+    }
+
+    @Override
+    public void zefiroptimizations$setPrevStepBobbingAmount(float prevStepBobbingAmount) {
+        this.prevStepBobbingAmount = prevStepBobbingAmount;
+    }
+
+    @Override
+    public int zefiroptimizations$getFallFlyingTicks() {
+        return fallFlyingTicks;
+    }
+
+    @Override
+    public void zefiroptimizations$setFallFlyingTicks(int fallFlyingTicks) {
+        this.fallFlyingTicks = fallFlyingTicks;
+    }
+
+    @Override
+    public void zefiroptimizations$playExtinguishSound() {
+        this.playExtinguishSound();
+    }
+
+    @Override
+    public void zefiroptimizations$addAirTravelEffects() {
+        this.addAirTravelEffects();
+    }
+
+    @Override
+    public void zefiroptimizations$playSwimSound() {
+        this.playSwimSound();
+    }
+
+    @Override
+    public float zefiroptimizations$calculateNextStepSoundDistance() {
+        return this.calculateNextStepSoundDistance();
+    }
+
+
+    @Override
+    public void zefiroptimizations$setFlag(int index, boolean value) {
+        setFlag(index, value);
+    }
+
+    @Override
+    public int zefiroptimizations$FALL_FLYING_FLAG_INDEX() {
+        return FALL_FLYING_FLAG_INDEX;
+    }
+
+    @Override
+    public int zefiroptimizations$USING_RIPTIDE_FLAG() {
+        return USING_RIPTIDE_FLAG;
+    }
+
+    @Override
+    public Vec3d zefiroptimizations$adjustMovementForSneaking(Vec3d movement, MovementType type) {
+        return adjustMovementForSneaking(movement, type);
+    }
+
+    @Override
+    public Entity.MoveEffect zefiroptimizations$getMoveEffect() {
+        return getMoveEffect();
+    }
+
+    @Override
+    public void zefiroptimizations$setVelocity(double x, double y, double z) {
+        this.zefiroptimizations$setVelocity(new Vec3d(x, y, z));
+    }
+
+
+    @Override
+    public Vec3d zefiroptimizations$getMovementMultiplier() {
+        return movementMultiplier;
+    }
+
+    @Override
+    public void zefiroptimizations$setMovementMultiplier(Vec3d movementMultiplier) {
+        this.movementMultiplier = movementMultiplier;
+    }
+
+//    @Override
+//    public void zefiroptimizations$setRemoved(Entity.RemovalReason reason) {
+//        this.setRemoved(reason);
+//    }
+
+    @Override
+    public boolean zefiroptimizations$getFlag(int index) {
+        return this.getFlag(index);
+    }
+
+    @Override
+    public void zefiroptimizations$tryCheckBlockCollision() {
+        this.tryCheckBlockCollision();
+    }
+
+    // ------------------------------------------------------------------
+
+    @Unique
+    private boolean isAsyncTicking = false;
+
+    @Unique
+    @Override
+    public boolean zefiroptimizations$isAsyncTicking() {
+        return isAsyncTicking;
     }
 
     @Unique
-    public void zefiroptimizations$customBaseTick() {
+    @Override
+    public void zefiroptimizations$setAsyncTicking(boolean asyncTicking) {
+        isAsyncTicking = asyncTicking;
+    }
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
-        World world = self.getWorld();
-
-        world.getProfiler().push("livingEntityBaseTick");
-
-        if (self.isAlive()) {
-            if (!world.isClient) {
-                if (self.isInsideWall()) {
-                    self.damage(self.getDamageSources().inWall(), 1.0F);
-                } else if (self instanceof PlayerEntity && !world.getWorldBorder().contains(self.getBoundingBox())) {
-                    WorldBorder worldBorder = world.getWorldBorder();
-                    double distanceInsideBorder = worldBorder.getDistanceInsideBorder(self);
-                    double safeZone = worldBorder.getSafeZone();
-                    double totalDistance = distanceInsideBorder + safeZone;
-
-                    if (totalDistance < 0.0) {
-                        double damagePerBlock = worldBorder.getDamagePerBlock();
-                        if (damagePerBlock > 0.0) {
-                            self.damage(self.getDamageSources().outsideBorder(), (float) Math.max(1, MathHelper.floor(-totalDistance * damagePerBlock)));
-                        }
-                    }
-                }
-            }
-
-            BlockPos blockPos = BlockPos.ofFloored(self.getX(), self.getEyeY(), self.getZ());
-            boolean inWater = self.isSubmergedIn(FluidTags.WATER) && !world.getBlockState(blockPos).isOf(Blocks.BUBBLE_COLUMN);
-
-            if (inWater) {
-                if (!self.isFireImmune()) {
-                    self.extinguish();
-                }
-                handleUnderwater(self);
-            } else {
-                if (self.isWet() || self.inPowderSnow) {
-                    self.extinguishWithSound();
-                }
-                if (self.getAir() < self.getMaxAir()) {
-                    self.setAir(this.getNextAirOnLand(self.getAir()));
-                }
-            }
-
-            if (world instanceof ServerWorld serverWorld) {
-                BlockPos currentBlockPos = self.getBlockPos();
-                if (!Objects.equal(this.lastBlockPos, currentBlockPos)) {
-                    this.lastBlockPos = currentBlockPos;
-                    this.applyMovementEffects(serverWorld, currentBlockPos);
-                }
-            }
-        } else if (world.shouldUpdatePostDeath(self)) {
-            this.updatePostDeath();
-        }
-
-        if (self.hurtTime > 0) {
-            self.hurtTime--;
-        }
-        if (self.timeUntilRegen > 0 && !(self instanceof ServerPlayerEntity)) {
-            self.timeUntilRegen--;
-        }
-        if (this.playerHitTimer > 0) {
-            this.playerHitTimer--;
-        } else {
-            this.attackingPlayer = null;
-        }
-
-        if ((this.attacking != null && !this.attacking.isAlive()) || (this.attacker != null && (!this.attacker.isAlive() || self.age - this.lastAttackedTime > 100))) {
-            this.attacking = null;
-            self.setAttacker(null);
-        }
-
-        this.tickStatusEffects();
-        this.prevLookDirection = this.lookDirection;
-        self.prevBodyYaw = self.bodyYaw;
-        self.prevHeadYaw = self.headYaw;
-        self.prevYaw = self.getYaw();
-        self.prevPitch = self.getPitch();
-        world.getProfiler().pop();
-    }
-
-    @Unique
-    private void handleUnderwater(LivingEntity self) {
-        World world = self.getWorld();
+        zefiroptimizations$setAsyncTicking(true);
         if (!world.isClient) {
-            boolean shouldDrown = !self.canBreatheInWater() && !StatusEffectUtil.hasWaterBreathing(self) && (!(self instanceof PlayerEntity) || !((PlayerEntity) self).getAbilities().invulnerable);
-            if (shouldDrown) {
-                self.setAir(this.getNextAirUnderwater(self.getAir()));
-                if (self.getAir() == -20) {
-                    self.setAir(0);
-                    Vec3d vec3d = self.getVelocity();
-                    for (int i = 0; i < 8; i++) {
-                        double f = self.getRandom().nextDouble() - self.getRandom().nextDouble();
-                        double g = self.getRandom().nextDouble() - self.getRandom().nextDouble();
-                        double h = self.getRandom().nextDouble() - self.getRandom().nextDouble();
-                        world.addParticle(ParticleTypes.BUBBLE, self.getX() + f, self.getY() + g, self.getZ() + h, vec3d.x, vec3d.y, vec3d.z);
-                    }
-                    self.damage(self.getDamageSources().drown(), 2.0F);
-                }
-            }
-
-            if (self.hasVehicle() && self.getVehicle() != null && self.getVehicle().shouldDismountUnderwater()) {
-                self.stopRiding();
-            }
+            ZefirOptimizations.getAsyncTickManager()
+                    .tell(new EntityActorMessages.EntityCreated(self), ActorRef.noSender());
         }
     }
 
-    @Unique
-    public void zefiroptimizations$customTickMovement() {
+    @Inject(method = "remove", at = @At("HEAD"))
+    private void onRemove(Entity.RemovalReason reason, CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if (jumpingCooldown > 0) {
-            jumpingCooldown--;
-        }
-
-        if (self.isLogicalSideForUpdatingMovement()) {
-            bodyTrackingIncrements = 0;
-            self.updateTrackedPosition(self.getX(), self.getY(), self.getZ());
-        }
-
-        if (bodyTrackingIncrements > 0) {
-            self.lerpPosAndRotation(bodyTrackingIncrements, serverX, serverY, serverZ, serverYaw, serverPitch);
-            bodyTrackingIncrements--;
-        } else if (!self.canMoveVoluntarily()) {
-            self.setVelocity(self.getVelocity().multiply(0.98));
-        }
-
-        if (headTrackingIncrements > 0) {
-            lerpHeadYaw(headTrackingIncrements, serverHeadYaw);
-            headTrackingIncrements--;
-        }
-
-        Vec3d velocity = self.getVelocity();
-        double d = Math.abs(velocity.x) < 0.003 ? 0.0 : velocity.x;
-        double e = Math.abs(velocity.y) < 0.003 ? 0.0 : velocity.y;
-        double f = Math.abs(velocity.z) < 0.003 ? 0.0 : velocity.z;
-        self.setVelocity(d, e, f);
-
-        World world = self.getWorld();
-        Profiler profiler = world.getProfiler();
-
-        profiler.push("ai");
-        if (isImmobile()) {
-            jumping = false;
-            self.sidewaysSpeed = 0.0F;
-            self.forwardSpeed = 0.0F;
-        } else if (self.canMoveVoluntarily()) {
-            profiler.push("newAi");
-            tickNewAi();
-            profiler.pop();
-        }
-        profiler.pop();
-
-        profiler.push("jump");
-        if (jumping && shouldSwimInFluids()) {
-            double fluidHeight = self.isInLava() ? self.getFluidHeight(FluidTags.LAVA) : self.getFluidHeight(FluidTags.WATER);
-            boolean touchingWater = self.isTouchingWater() && fluidHeight > 0.0;
-            double swimHeight = self.getSwimHeight();
-
-            if ((!touchingWater || (self.isOnGround() && fluidHeight <= swimHeight)) && jumpingCooldown == 0) {
-                self.jump();
-                jumpingCooldown = 10;
-            } else if (self.isInLava() && !self.isOnGround() || (touchingWater && fluidHeight > swimHeight)) {
-                swimUpward(self.isInLava() ? FluidTags.LAVA : FluidTags.WATER);
-            }
-        } else {
-            jumpingCooldown = 0;
-        }
-        profiler.pop();
-
-        profiler.push("travel");
-        self.sidewaysSpeed *= 0.98F;
-        self.forwardSpeed *= 0.98F;
-        tickFallFlying();
-
-        Vec3d travelVec = new Vec3d(self.sidewaysSpeed, self.upwardSpeed, self.forwardSpeed);
-        if (self.getControllingPassenger() instanceof PlayerEntity player && self.isAlive()) {
-            travelControlled(player, travelVec);
-        } else {
-            self.travel(travelVec);
-        }
-        profiler.pop();
-
-        profiler.push("freezing");
-        if (!world.isClient && !self.isDead()) {
-            int frozenTicks = self.getFrozenTicks();
-            if (self.inPowderSnow && self.canFreeze()) {
-                self.setFrozenTicks(Math.min(self.getMinFreezeDamageTicks(), frozenTicks + 1));
-            } else {
-                self.setFrozenTicks(Math.max(0, frozenTicks - 2));
-            }
-        }
-        removePowderSnowSlow();
-        addPowderSnowSlowIfNeeded();
-
-        if (!world.isClient && self.age % 40 == 0 && self.isFrozen() && self.canFreeze()) {
-            self.damage(self.getDamageSources().freeze(), 1.0F);
-        }
-        profiler.pop();
-
-        profiler.push("push");
-        if (riptideTicks > 0) {
-            riptideTicks--;
-            tickRiptide(self.getBoundingBox(), self.getBoundingBox());
-        }
-        tickCramming();
-        profiler.pop();
-
-        if (!world.isClient && self.hurtByWater() && self.isWet()) {
-            self.damage(self.getDamageSources().drown(), 1.0F);
-        }
-    }
-
-    @Unique
-    public void zefiroptimizations$customTravel(Vec3d movementInput) {
-        LivingEntity self = (LivingEntity) (Object) this;
-
-        if (!self.isLogicalSideForUpdatingMovement()) {
-            return;
-        }
-
-        double gravity = self.getFinalGravity();
-        boolean isFalling = self.getVelocity().y <= 0.0;
-        if (isFalling && self.hasStatusEffect(StatusEffects.SLOW_FALLING)) {
-            gravity = Math.min(gravity, 0.01);
-        }
-
-        FluidState fluidState = self.getWorld().getFluidState(self.getBlockPos());
-
-        if (self.isTouchingWater() && shouldSwimInFluids() && !self.canWalkOnFluid(fluidState)) {
-            handleWaterMovement(self, movementInput, gravity, isFalling);
-        } else if (self.isInLava() && shouldSwimInFluids() && !self.canWalkOnFluid(fluidState)) {
-            handleLavaMovement(self, movementInput, gravity, isFalling);
-        } else if (self.isFallFlying()) {
-            handleFallFlying(self, movementInput, gravity);
-        } else {
-            handleDefaultMovement(self, movementInput, gravity);
-        }
-
-        self.updateLimbs(this instanceof Flutterer);
-    }
-
-    @Unique
-    private void handleWaterMovement(LivingEntity self, Vec3d movementInput, double gravity, boolean isFalling) {
-        double initialY = self.getY();
-        float baseSpeed = self.isSprinting() ? 0.9F : getBaseMovementSpeedMultiplier();
-        float velocityMultiplier = 0.02F;
-        float waterEfficiency = (float) self.getAttributeValue(EntityAttributes.GENERIC_WATER_MOVEMENT_EFFICIENCY);
-        if (!self.isOnGround()) {
-            waterEfficiency *= 0.5F;
-        }
-
-        if (waterEfficiency > 0.0F) {
-            baseSpeed += (0.54600006F - baseSpeed) * waterEfficiency;
-            velocityMultiplier += (self.getMovementSpeed() - velocityMultiplier) * waterEfficiency;
-        }
-
-        if (self.hasStatusEffect(StatusEffects.DOLPHINS_GRACE)) {
-            baseSpeed = 0.96F;
-        }
-
-        self.updateVelocity(velocityMultiplier, movementInput);
-        self.move(MovementType.SELF, self.getVelocity());
-        Vec3d velocity = self.getVelocity();
-
-        if (self.horizontalCollision && self.isClimbing()) {
-            velocity = new Vec3d(velocity.x, 0.2, velocity.z);
-        }
-
-        self.setVelocity(velocity.multiply(baseSpeed, 0.8F, baseSpeed));
-        Vec3d newVelocity = self.applyFluidMovingSpeed(gravity, isFalling, self.getVelocity());
-        self.setVelocity(newVelocity);
-
-        if (self.horizontalCollision && self.doesNotCollide(newVelocity.x, newVelocity.y + 0.6F - self.getY() + initialY, newVelocity.z)) {
-            self.setVelocity(newVelocity.x, 0.3F, newVelocity.z);
-        }
-    }
-
-    @Unique
-    private void handleLavaMovement(LivingEntity self, Vec3d movementInput, double gravity, boolean isFalling) {
-        double initialY = self.getY();
-        self.updateVelocity(0.02F, movementInput);
-        self.move(MovementType.SELF, self.getVelocity());
-
-        if (self.getFluidHeight(FluidTags.LAVA) <= self.getSwimHeight()) {
-            self.setVelocity(self.getVelocity().multiply(0.5, 0.8F, 0.5));
-            Vec3d newVelocity = self.applyFluidMovingSpeed(gravity, isFalling, self.getVelocity());
-            self.setVelocity(newVelocity);
-        } else {
-            self.setVelocity(self.getVelocity().multiply(0.5));
-        }
-
-        if (gravity != 0.0) {
-            self.setVelocity(self.getVelocity().add(0.0, -gravity / 4.0, 0.0));
-        }
-
-        Vec3d velocity = self.getVelocity();
-        if (self.horizontalCollision && self.doesNotCollide(velocity.x, velocity.y + 0.6F - self.getY() + initialY, velocity.z)) {
-            self.setVelocity(velocity.x, 0.3F, velocity.z);
-        }
-    }
-
-    @Unique
-    private void handleFallFlying(LivingEntity self, Vec3d movementInput, double gravity) {
-        self.limitFallDistance();
-        Vec3d velocity = self.getVelocity();
-        Vec3d rotationVector = self.getRotationVector();
-        float pitchRadians = self.getPitch() * (float) (Math.PI / 180.0);
-        double horizontalLength = Math.sqrt(rotationVector.x * rotationVector.x + rotationVector.z * rotationVector.z);
-        double velocityHorizontalLength = velocity.horizontalLength();
-        double rotationVectorLength = rotationVector.length();
-        double cosinePitch = Math.cos(pitchRadians);
-        cosinePitch = cosinePitch * cosinePitch * Math.min(1.0, rotationVectorLength / 0.4);
-        velocity = self.getVelocity().add(0.0, gravity * (-1.0 + cosinePitch * 0.75), 0.0);
-
-        if (velocity.y < 0.0 && horizontalLength > 0.0) {
-            double negativeVelocityY = velocity.y * -0.1 * cosinePitch;
-            velocity = velocity.add(rotationVector.x * negativeVelocityY / horizontalLength, negativeVelocityY, rotationVector.z * negativeVelocityY / horizontalLength);
-        }
-
-        if (pitchRadians < 0.0F && horizontalLength > 0.0) {
-            double negativeSinPitch = velocityHorizontalLength * (double) (-MathHelper.sin(pitchRadians)) * 0.04;
-            velocity = velocity.add(-rotationVector.x * negativeSinPitch / horizontalLength, negativeSinPitch * 3.2, -rotationVector.z * negativeSinPitch / horizontalLength);
-        }
-
-        if (horizontalLength > 0.0) {
-            velocity = velocity.add((rotationVector.x / horizontalLength * velocityHorizontalLength - velocity.x) * 0.1, 0.0, (rotationVector.z / horizontalLength * velocityHorizontalLength - velocity.z) * 0.1);
-        }
-
-        self.setVelocity(velocity.multiply(0.99F, 0.98F, 0.99F));
-        self.move(MovementType.SELF, self.getVelocity());
-
-        if (self.horizontalCollision && !self.getWorld().isClient) {
-            double finalHorizontalLength = self.getVelocity().horizontalLength();
-            double difference = velocityHorizontalLength - finalHorizontalLength;
-            float damage = (float) (difference * 10.0 - 3.0);
-            if (damage > 0.0F) {
-                self.playSound(getFallSound((int) damage), 1.0F, 1.0F);
-                self.damage(self.getDamageSources().flyIntoWall(), damage);
-            }
-        }
-
-        if (self.isOnGround() && !self.getWorld().isClient) {
-            self.setFlag(Entity.FALL_FLYING_FLAG_INDEX, false);
-        }
-    }
-
-    @Unique
-    private void handleDefaultMovement(LivingEntity self, Vec3d movementInput, double gravity) {
-        BlockPos blockPos = self.getVelocityAffectingPos();
-        float blockSlipperiness = self.getWorld().getBlockState(blockPos).getBlock().getSlipperiness();
-        float slipperiness = self.isOnGround() ? blockSlipperiness * 0.91F : 0.91F;
-        Vec3d velocity = self.applyMovementInput(movementInput, blockSlipperiness);
-        double yVelocity = velocity.y;
-
-        if (self.hasStatusEffect(StatusEffects.LEVITATION)) {
-            yVelocity += (0.05 * (double) (self.getStatusEffect(StatusEffects.LEVITATION).getAmplifier() + 1) - velocity.y) * 0.2;
-        } else if (!self.getWorld().isClient || self.getWorld().isChunkLoaded(blockPos)) {
-            yVelocity -= gravity;
-        } else if (self.getY() > (double) self.getWorld().getBottomY()) {
-            yVelocity = -0.1;
-        } else {
-            yVelocity = 0.0;
-        }
-
-        if (self.hasNoDrag()) {
-            self.setVelocity(velocity.x, yVelocity, velocity.z);
-        } else {
-            self.setVelocity(velocity.x * (double) slipperiness, this instanceof Flutterer ? yVelocity * (double) slipperiness : yVelocity * 0.98F, velocity.z * (double) slipperiness);
-        }
-    }
-
-    @Unique
-    public void zefiroptimizations$cutomTick() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        this.tickActiveItemStack();
-        this.updateLeaningPitch();
-
         if (!self.getWorld().isClient) {
-            handleArrowsAndStingers();
-            handleEquipmentChanges();
-            handleSleeping();
-        }
-
-        if (!self.isRemoved()) {
-            self.tickMovement();
-        }
-
-        updateMovement();
-        updateBodyYaw();
-        updateStepBobbingAmount();
-        updateHeadTurn();
-        normalizeAngles();
-        this.lookDirection += updateHeadTurn();
-
-        handleFallFlying();
-        handleSleepingPitch();
-        updateAttributesIfNeeded();
-    }
-
-    @Unique
-    private void handleArrowsAndStingers() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        int i = self.getStuckArrowCount();
-        if (i > 0) {
-            updateTimer(i, self.stuckArrowTimer, self::setStuckArrowCount);
-        }
-
-        int j = self.getStingerCount();
-        if (j > 0) {
-            updateTimer(j, self.stuckStingerTimer, self::setStingerCount);
+            ZefirOptimizations.getAsyncTickManager()
+                    .tell(new EntityActorMessages.EntityRemoved(self), ActorRef.noSender());
         }
     }
 
-    @Unique
-    private void updateTimer(int count, int timer, Consumer<Integer> setCount) {
-        if (timer <= 0) {
-            timer = 20 * (30 - count);
-        }
-        timer--;
-        if (timer <= 0) {
-            setCount.accept(count - 1);
-        }
-    }
-
-    @Unique
-    private void handleEquipmentChanges() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (self.age % 20 == 0) {
-            self.getDamageTracker().update();
-        }
-    }
-
-    @Unique
-    private void handleSleeping() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (self.isSleeping() && !this.isSleepingInBed()) {
-            self.wakeUp();
-        }
-    }
-
-    @Unique
-    private void updateMovement() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        double d = self.getX() - self.prevX;
-        double e = self.getZ() - self.prevZ;
-        float f = (float)(d * d + e * e);
-        float g = self.bodyYaw;
-
-        if (f > 0.0025000002F) {
-            updateYaw(d, e, f, g);
-        }
-
-        if (self.handSwingProgress > 0.0F) {
-            g = self.getYaw();
-        }
-    }
-
-    @Unique
-    private void updateYaw(double d, double e, float f, float g) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        float h = (float)Math.sqrt(f) * 3.0F;
-        float l = (float) MathHelper.atan2(e, d) * (180.0F / (float)Math.PI) - 90.0F;
-        float m = MathHelper.abs(MathHelper.wrapDegrees(self.getYaw()) - l);
-
-        if (95.0F < m && m < 265.0F) {
-            g = l - 180.0F;
+    @Redirect(method = "tickMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;travel(Lnet/minecraft/util/math/Vec3d;)V"))
+    private void zefiroptimizations$redirectTravel(LivingEntity instance, Vec3d movementInput) {
+        if (instance instanceof IAsyncTickingLivingEntity) {
+            // Prevent the original method from being called when async ticking
+            // The movement logic is now handled by the EntityActor
         } else {
-            g = l;
-        }
-
-        if (!self.isOnGround()) {
-            this.stepBobbingAmount = this.stepBobbingAmount + (1.0F - this.stepBobbingAmount) * 0.3F;
+            // Call the original method when not async ticking
+            instance.travel(movementInput);
         }
     }
 
-    @Unique
-    private void updateBodyYaw() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        while (self.getYaw() - self.prevYaw < -180.0F) {
-            self.prevYaw -= 360.0F;
-        }
-        while (self.getYaw() - self.prevYaw >= 180.0F) {
-            self.prevYaw += 360.0F;
-        }
-        while (self.bodyYaw - self.prevBodyYaw < -180.0F) {
-            self.prevBodyYaw -= 360.0F;
-        }
-        while (self.bodyYaw - self.prevBodyYaw >= 180.0F) {
-            self.prevBodyYaw += 360.0F;
-        }
-    }
-
-    @Unique
-    private void updateStepBobbingAmount() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (!self.isOnGround()) {
-            this.stepBobbingAmount = this.stepBobbingAmount + (0.0F - this.stepBobbingAmount) * 0.3F;
-        }
-    }
-
-    @Unique
-    private float updateHeadTurn() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        float h = 0.0F;
-        self.getWorld().getProfiler().push("headTurn");
-        h = this.turnHead(self.bodyYaw, h);
-        self.getWorld().getProfiler().pop();
-        return h;
-    }
-
-    @Unique
-    private void normalizeAngles() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        normalizeAngle(self::getYaw, self.prevYaw);
-        normalizeAngle(self::getBodyYaw, self.prevBodyYaw);
-        normalizeAngle(self::getPitch, self.prevPitch);
-        normalizeAngle(self::getHeadYaw, self.prevHeadYaw);
-    }
-
-    @Unique
-    private void normalizeAngle(Supplier<Float> angle, float prevAngle) {
-        while (angle.get() - prevAngle < -180.0F) {
-            prevAngle -= 360.0F;
-        }
-        while (angle.get() - prevAngle >= 180.0F) {
-            prevAngle += 360.0F;
-        }
-    }
-
-    @Unique
-    private void handleFallFlying() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (self.isFallFlying()) {
-            this.fallFlyingTicks++;
+    @Redirect(
+            method = "travel",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;applyFluidMovingSpeed(DZLnet/minecraft/util/math/Vec3d;)Lnet/minecraft/util/math/Vec3d;")
+    )
+    private Vec3d zefiroptimizations$redirectApplyFluidMovingSpeed(LivingEntity instance, double gravity, boolean falling, Vec3d motion) {
+        if (instance instanceof IAsyncTickingLivingEntity) {
+            // Prevent the original method from being called when async ticking
+            return motion;
         } else {
-            this.fallFlyingTicks = 0;
+            return instance.applyFluidMovingSpeed(gravity, falling, motion);
         }
     }
 
-    @Unique
-    private void handleSleepingPitch() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (self.isSleeping()) {
-            self.setPitch(0.0F);
+    @Redirect(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;move(Lnet/minecraft/entity/MovementType;Lnet/minecraft/util/math/Vec3d;)V"))
+    private void zefiroptimizations$redirectMove(LivingEntity instance, MovementType movementType, Vec3d movement) {
+        if (instance instanceof IAsyncTickingLivingEntity) {
+            // Prevent the original method from being called when async ticking
+        } else {
+            instance.move(movementType, movement);
         }
     }
-
-    @Unique
-    private void updateAttributesIfNeeded() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        float l = self.getScale();
-        if (l != this.prevScale) {
-            this.prevScale = l;
-            self.calculateDimensions();
-        }
-    }
-
 }

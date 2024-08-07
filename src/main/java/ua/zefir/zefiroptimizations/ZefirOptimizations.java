@@ -2,37 +2,51 @@ package ua.zefir.zefiroptimizations;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import akka.actor.Props;
-import com.ericsson.otp.erlang.*;
 import lombok.Getter;
 import net.fabricmc.api.ModInitializer;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ua.zefir.zefiroptimizations.threading.MovementPredictionActor;
-import ua.zefir.zefiroptimizations.threading.WorldSnapshotActor;
+import ua.zefir.zefiroptimizations.actors.AsyncTickManagerActor;
+import ua.zefir.zefiroptimizations.actors.EntityActorMessages;
 
-import static ua.zefir.zefiroptimizations.Commands.registerCommands;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class ZefirOptimizations implements ModInitializer {
-    public static final Logger LOGGER = LoggerFactory.getLogger("zefiroptimizations");
+	public static final Logger LOGGER = LoggerFactory.getLogger("zefiroptimizations");
+	public static MinecraftServer SERVER;
 	@Getter
-    private static OtpConnection connection;
-	public static ActorSystem ACTOR_SYSTEM;
-	public static ActorRef WORLD_SNAPSHOT_ACTOR;
-	public static ActorRef MOVEMENT_PREDICTION_ACTOR;
+	private static ActorSystem actorSystem;
+	@Getter
+	private static ActorRef asyncTickManager;
 
 	@Override
 	public void onInitialize() {
 		LOGGER.info("Hello Fabric world!");
-		registerCommands();
 
-		ACTOR_SYSTEM = ActorSystem.create("MinecraftCollisionSystem");
+		actorSystem = ActorSystem.create("MinecraftActorSystem");
+		asyncTickManager = actorSystem.actorOf(AsyncTickManagerActor.props(), "asyncTickManager");
 
-		// Create the actors (you can do this here or in the mixin)
-		WORLD_SNAPSHOT_ACTOR = ACTOR_SYSTEM.actorOf(Props.create(WorldSnapshotActor.class));
-		MOVEMENT_PREDICTION_ACTOR = ACTOR_SYSTEM.actorOf(Props.create(MovementPredictionActor.class));
+		ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
+		ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
 
+		Commands.registerCommands();
 	}
 
+	private void onServerStarting(MinecraftServer server) {
+		SERVER = server;
+	}
+	private void onServerStarted(MinecraftServer server) {
+
+		ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+		executor.scheduleAtFixedRate(() -> {
+			if (SERVER != null) {
+				asyncTickManager.tell(new EntityActorMessages.AsyncTick(), ActorRef.noSender());
+			}
+		}, 0, 50, TimeUnit.MILLISECONDS); // 20 ticks per second
+	}
 }

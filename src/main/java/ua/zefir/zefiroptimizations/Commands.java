@@ -14,7 +14,7 @@ public class Commands {
     public static boolean entityOptimizations2 = false;
     public static boolean collisionViewOptimization = false;
     public static boolean customComputeNextOptimization = false;
-    public static boolean livingEntityOptimization = true;
+    public static boolean livingEntityOptimization = false;
     public static void registerCommands() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(CommandManager.literal("villagers_switch")
