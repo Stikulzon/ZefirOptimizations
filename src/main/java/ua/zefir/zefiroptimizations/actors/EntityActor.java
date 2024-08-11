@@ -15,7 +15,6 @@ import net.minecraft.block.PowderSnowBlock;
 import net.minecraft.entity.*;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.FluidState;
@@ -31,14 +30,12 @@ import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.*;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.Difficulty;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import net.minecraft.world.border.WorldBorder;
 import net.minecraft.world.event.GameEvent;
 import org.jetbrains.annotations.Nullable;
-import ua.zefir.zefiroptimizations.ZefirOptimizations;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,14 +49,10 @@ public class EntityActor extends AbstractActor {
     @Getter
     private final IAsyncLivingEntityAccess entityAccess;
     private final ThreadLocalRandom random = ThreadLocalRandom.current();
-    private Vec3d position;
-//    private Vec3d velocity;
 
     public EntityActor(LivingEntity entity) {
         this.entity = entity;
         this.entityAccess = (IAsyncLivingEntityAccess) entity;
-//        this.position = entity.getPos();
-//        this.velocity = entity.getVelocity();
     }
 
     public static Props props(LivingEntity entity) {
@@ -73,42 +66,10 @@ public class EntityActor extends AbstractActor {
                 .build();
     }
 
-//    public void checkDespawn() {
-//        if(entity instanceof MobEntity mobEntity) {
-//            if (mobEntity.getWorld().getDifficulty() == Difficulty.PEACEFUL && mobEntity.isDisallowedInPeaceful()) {
-//                mobEntity.discard();
-//            } else if (!mobEntity.isPersistent() && !mobEntity.cannotDespawn()) {
-//                Entity entity = mobEntity.getWorld().getClosestPlayer(mobEntity, -1.0);
-//                if (entity != null) {
-//                    double d = entity.squaredDistanceTo(mobEntity);
-//                    int i = mobEntity.getType().getSpawnGroup().getImmediateDespawnRange();
-//                    int j = i * i;
-//                    if (d > (double) j && mobEntity.canImmediatelyDespawn(d)) {
-//                        mobEntity.discard();
-//                    }
-//
-//                    int k = mobEntity.getType().getSpawnGroup().getDespawnStartRange();
-//                    int l = k * k;
-//                    if (mobEntity.getDespawnCounter() > 600 && this.random.nextInt(800) == 0 && d > (double) l && mobEntity.canImmediatelyDespawn(d)) {
-//                        mobEntity.discard();
-//                    } else if (d < (double) l) {
-//                        mobEntity.setDespawnCounter(0);
-//                    }
-//                }
-//            } else {
-//                mobEntity.setDespawnCounter(0);
-//            }
-//        }
-//    }
-
     protected void handleAsyncTick(EntityActorMessages.AsyncTick msg) {
-//        if (entity instanceof IAsyncTickingLivingEntity) {
             if (!entity.isRemoved()) {
                 this.tickMovement();
             }
-            ZefirOptimizations.getAsyncTickManager()
-                    .tell(new EntityActorMessages.SyncPosition(entity, position), getSelf());
-//        }
     }
 
     protected void tickMovement() {
@@ -233,6 +194,7 @@ public class EntityActor extends AbstractActor {
             this.tickRiptide(box, entity.getBoundingBox());
         }
 
+//        entityAccess.zefiroptimizations$tickCramming();
         this.tickCramming();
         entity.getWorld().getProfiler().pop();
         if (!entity.getWorld().isClient && entity.hurtByWater() && entity.isWet()) {
@@ -251,13 +213,12 @@ public class EntityActor extends AbstractActor {
                     .forEach(entityAccess::zefiroptimizations$pushAway);
         } else {
             List<Entity> list = entity.getWorld().getOtherEntities(entity, entity.getBoundingBox(), EntityPredicates.canBePushedBy(entity));
-            List<Entity> listCopy = new ArrayList<>(list);
 
-            if (!listCopy.isEmpty()) {
+            if (!list.isEmpty()) {
                 int maxEntityCramming = entity.getWorld().getGameRules().getInt(GameRules.MAX_ENTITY_CRAMMING);
-                if (maxEntityCramming > 0 && listCopy.size() > maxEntityCramming - 1 && random.nextInt(4) == 0) {
+                if (maxEntityCramming > 0 && list.size() > maxEntityCramming - 1 && random.nextInt(4) == 0) {
                     int nonVehicleEntities = 0;
-                    for (Entity entity : listCopy) {
+                    for (Entity entity : list) {
                         if (!entity.hasVehicle()) {
                             nonVehicleEntities++;
                         }
@@ -269,7 +230,7 @@ public class EntityActor extends AbstractActor {
                 }
 
                 // Create a new list to store entities to be pushed
-                List<Entity> entitiesToPush = new ArrayList<>(listCopy);
+                List<Entity> entitiesToPush = new ArrayList<>(list);
 
                 // Push entities away after the loop
                 for (Entity entity2 : entitiesToPush) {

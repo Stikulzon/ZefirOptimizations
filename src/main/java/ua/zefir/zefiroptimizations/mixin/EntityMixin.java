@@ -16,12 +16,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
-import ua.zefir.zefiroptimizations.actors.IAsyncTickingLivingEntity;
 import ua.zefir.zefiroptimizations.actors.IAsyncLivingEntityAccess;
-
-import java.util.List;
 
 @Getter
 @Mixin(Entity.class)

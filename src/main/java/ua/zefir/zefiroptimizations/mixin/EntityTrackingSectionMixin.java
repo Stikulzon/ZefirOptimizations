@@ -31,11 +31,11 @@ public abstract class EntityTrackingSectionMixin<T extends EntityLike> {
     @Unique
     private CopyOnWriteArrayList<T> collection;
     @Unique
-    private AtomicReference<EntityTrackingStatus> status;
+    private volatile EntityTrackingStatus status;
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void onInit(Class entityClass, EntityTrackingStatus initialStatus, CallbackInfo ci) {
-        this.status = new AtomicReference<>(initialStatus);
+        this.status = initialStatus;
         this.collection = new CopyOnWriteArrayList<>();
     }
 
@@ -51,23 +51,30 @@ public abstract class EntityTrackingSectionMixin<T extends EntityLike> {
 
     @Overwrite
     public LazyIterationConsumer.NextIteration forEach(Box box, LazyIterationConsumer<T> consumer) {
-        for (T entityLike : this.collection) {
+        for (T entityLike : this.collection) { // Iteration is thread-safe due to CopyOnWriteArrayList
             if (entityLike.getBoundingBox().intersects(box) && consumer.accept(entityLike).shouldAbort()) {
                 return LazyIterationConsumer.NextIteration.ABORT;
             }
         }
+
         return LazyIterationConsumer.NextIteration.CONTINUE;
     }
 
     @Overwrite
     public <U extends T> LazyIterationConsumer.NextIteration forEach(TypeFilter<T, U> type, Box box, LazyIterationConsumer<? super U> consumer) {
-        for (T entityLike : this.collection) {
-            U entityLike2 = type.downcast(entityLike);
-            if (entityLike2 != null && entityLike.getBoundingBox().intersects(box) && consumer.accept(entityLike2).shouldAbort()) {
-                return LazyIterationConsumer.NextIteration.ABORT;
+        Collection<? extends T> collection = this.collection.stream().filter(type.getBaseClass()::isInstance).toList();
+        if (collection.isEmpty()) {
+            return LazyIterationConsumer.NextIteration.CONTINUE;
+        } else {
+            for (T entityLike : collection) {
+                U entityLike2 = (U)type.downcast(entityLike);
+                if (entityLike2 != null && entityLike.getBoundingBox().intersects(box) && consumer.accept(entityLike2).shouldAbort()) {
+                    return LazyIterationConsumer.NextIteration.ABORT;
+                }
             }
+
+            return LazyIterationConsumer.NextIteration.CONTINUE;
         }
-        return LazyIterationConsumer.NextIteration.CONTINUE;
     }
 
     @Overwrite
@@ -82,12 +89,14 @@ public abstract class EntityTrackingSectionMixin<T extends EntityLike> {
 
     @Overwrite
     public EntityTrackingStatus getStatus() {
-        return this.status.get();  // AtomicReference provides thread-safe access
+        return this.status;  // AtomicReference provides thread-safe access
     }
 
     @Overwrite
     public EntityTrackingStatus swapStatus(EntityTrackingStatus newStatus) {
-        return this.status.getAndSet(newStatus);  // AtomicReference provides atomic swap operation
+        EntityTrackingStatus entityTrackingStatus = this.status;
+        this.status = newStatus;
+        return entityTrackingStatus;
     }
 
     @Overwrite

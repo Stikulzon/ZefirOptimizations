@@ -13,10 +13,10 @@ import static ua.zefir.zefiroptimizations.Commands.isOptimizeVillagers;
 
 @Mixin(WorkStationCompetitionTask.class)
 public class WorkStationCompetitionTaskMixin {
-    @Inject(method = "create", at = @At("HEAD"), cancellable = true)
-    private static void create(CallbackInfoReturnable<Task<VillagerEntity>> cir){
-        if(isOptimizeVillagers) {
-            cir.setReturnValue(WorkStationCompetitionTaskModified.create());
-        }
-    }
+//    @Inject(method = "create", at = @At("HEAD"), cancellable = true)
+//    private static void create(CallbackInfoReturnable<Task<VillagerEntity>> cir){
+//        if(isOptimizeVillagers) {
+//            cir.setReturnValue(WorkStationCompetitionTaskModified.create());
+//        }
+//    }
 }

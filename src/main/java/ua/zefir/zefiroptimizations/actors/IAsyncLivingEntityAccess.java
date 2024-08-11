@@ -31,6 +31,8 @@ public interface IAsyncLivingEntityAccess {
 
     int zefiroptimizations$USING_RIPTIDE_FLAG();
 
+    void zefiroptimizations$tickCramming();
+
     void zefiroptimizations$setBlockPos(BlockPos pos);
 
     void zefiroptimizations$playStepSounds(BlockPos pos, BlockState state);

@@ -8,8 +8,10 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MovementType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
@@ -101,11 +103,25 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
     protected abstract void addPowderSnowSlowIfNeeded();
     @Shadow
     protected abstract boolean isImmobile();
+    @Shadow
+    protected abstract void tickCramming();
+    @Shadow
+    protected abstract void tickRiptide(Box a, Box b);
 
     @Override
     public boolean zefiroptimizations$isImmobile() {
         return this.isImmobile();
     }
+
+    @Override
+    public void zefiroptimizations$tickCramming() {
+        this.tickCramming();
+    }
+
+//    @Override
+//    public void zefiroptimizations$tickRiptide(Box a, Box b) {
+//        this.tickRiptide(a, b);
+//    }
 
     @Override
     public void zefiroptimizations$removePowderSnowSlow() {
@@ -496,37 +512,24 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
         }
     }
 
-    @Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;tickMovement()V"))
-    private void zefiroptimizations$redirectTravel(LivingEntity instance) {
-        if (instance instanceof IAsyncTickingLivingEntity && !(instance instanceof PlayerEntity)) {
-            // Prevent the original method from being called when async ticking
-            // The movement logic is now handled by the EntityActor
-            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(instance), ActorRef.noSender());
-        } else {
-            // Call the original method when not async ticking
-            instance.tickMovement();
+//    @Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;tickMovement()V"))
+//    private void zefiroptimizations$redirectTravel(LivingEntity instance) {
+//        if (!(instance instanceof PlayerEntity)) {
+//            // Prevent the original method from being called when async ticking
+//            // The movement logic is now handled by the EntityActor
+//            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(instance), ActorRef.noSender());
+//        } else {
+//            // Call the original method when not async ticking
+//            instance.tickMovement();
+//        }
+//    }
+
+    @Inject(method = "tickMovement", at = @At("HEAD"), cancellable = true)
+    private void onRemove(CallbackInfo ci) {
+        LivingEntity self = (LivingEntity) (Object) this;
+        if (!(self instanceof PlayerEntity)) {
+            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
+            ci.cancel();
         }
     }
-
-//    @Redirect(
-//            method = "travel",
-//            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;applyFluidMovingSpeed(DZLnet/minecraft/util/math/Vec3d;)Lnet/minecraft/util/math/Vec3d;")
-//    )
-//    private Vec3d zefiroptimizations$redirectApplyFluidMovingSpeed(LivingEntity instance, double gravity, boolean falling, Vec3d motion) {
-//        if (instance instanceof IAsyncTickingLivingEntity) {
-//            // Prevent the original method from being called when async ticking
-//            return motion;
-//        } else {
-//            return instance.applyFluidMovingSpeed(gravity, falling, motion);
-//        }
-//    }
-//
-//    @Redirect(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;move(Lnet/minecraft/entity/MovementType;Lnet/minecraft/util/math/Vec3d;)V"))
-//    private void zefiroptimizations$redirectMove(LivingEntity instance, MovementType movementType, Vec3d movement) {
-//        if (instance instanceof IAsyncTickingLivingEntity) {
-//            // Prevent the original method from being called when async ticking
-//        } else {
-//            instance.move(movementType, movement);
-//        }
-//    }
 }

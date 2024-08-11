@@ -6,10 +6,12 @@
     "BlockCollisionSpliteratorMixin",
     "CheckedRandomMixin",
     "CollisionViewMixin",
+    "EntityIndexMixin",
     "EntityListMixin",
     "EntityMixin",
     "EntityMixin1",
     "EntityTrackingSectionMixin",
+    "EntityViewMixin",
     "LivingEntityMixin",
     "PalettedContainerMixin",
     "WorkStationCompetitionTaskMixin"

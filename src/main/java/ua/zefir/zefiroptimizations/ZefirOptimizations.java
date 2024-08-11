@@ -42,11 +42,11 @@ public class ZefirOptimizations implements ModInitializer {
 	}
 
 	private void onServerStarted(MinecraftServer server) {
-		ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-		executor.scheduleAtFixedRate(() -> {
-			if (SERVER != null) {
-				asyncTickManager.tell(new EntityActorMessages.AsyncTick(), ActorRef.noSender());
-			}
-		}, 0, 50, TimeUnit.MILLISECONDS); // 20 ticks per second
+//		ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+//		executor.scheduleAtFixedRate(() -> {
+//			if (SERVER != null) {
+//				asyncTickManager.tell(new EntityActorMessages.AsyncTick(), ActorRef.noSender());
+//			}
+//		}, 0, 50, TimeUnit.MILLISECONDS); // 20 ticks per second
 	}
 }
