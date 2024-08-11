@@ -9,7 +9,9 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -18,6 +20,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import ua.zefir.zefiroptimizations.actors.IAsyncTickingLivingEntity;
 import ua.zefir.zefiroptimizations.actors.IAsyncLivingEntityAccess;
+
+import java.util.List;
 
 @Getter
 @Mixin(Entity.class)
@@ -94,6 +98,8 @@ public abstract class EntityMixin implements IAsyncLivingEntityAccess {
     protected abstract Vec3d adjustMovementForSneaking(Vec3d movement, MovementType type);
     @Shadow
     protected abstract Vec3d adjustMovementForCollisions(Vec3d movement);
+//    @Shadow
+//    private static Vec3d adjustMovementForCollisions(Vec3d movement, Box entityBoundingBox, List<VoxelShape> collisions);
 
     @Override
     public void zefiroptimizations$setBlockPos(BlockPos pos) {
@@ -222,17 +228,17 @@ public abstract class EntityMixin implements IAsyncLivingEntityAccess {
         this.onGround = onGround;
     }
 
-    @Redirect(
-            method = "move",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;adjustMovementForSneaking(Lnet/minecraft/util/math/Vec3d;Lnet/minecraft/entity/MovementType;)Lnet/minecraft/util/math/Vec3d;")
-    )
-    private Vec3d zefiroptimizations$redirectAdjustMovementForSneaking(Entity instance, Vec3d movement, MovementType type) {
-//        if (instance instanceof IAsyncTickingLivingEntity) {
-            // Prevent the original method from being called when async ticking
-            return movement;
-//        }
-//        else {
-//            return ((IAsyncLivingEntityAccess) instance).zefiroptimizations$adjustMovementForSneaking(movement, type);
-//        }
-    }
+//    @Redirect(
+//            method = "move",
+//            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;adjustMovementForSneaking(Lnet/minecraft/util/math/Vec3d;Lnet/minecraft/entity/MovementType;)Lnet/minecraft/util/math/Vec3d;")
+//    )
+//    private Vec3d zefiroptimizations$redirectAdjustMovementForSneaking(Entity instance, Vec3d movement, MovementType type) {
+////        if (instance instanceof IAsyncTickingLivingEntity) {
+//            // Prevent the original method from being called when async ticking
+//            return movement;
+////        }
+////        else {
+////            return ((IAsyncLivingEntityAccess) instance).zefiroptimizations$adjustMovementForSneaking(movement, type);
+////        }
+//    }
 }

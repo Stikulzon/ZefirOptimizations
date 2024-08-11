@@ -1,1 +1,7 @@
 accessWidener v2 named
+
+accessible class net/minecraft/world/chunk/PaletteResizeListener
+accessible class net/minecraft/world/chunk/PalettedContainer$Data
+accessible field net/minecraft/world/chunk/PalettedContainer$Data palette Lnet/minecraft/world/chunk/Palette;
+accessible field net/minecraft/world/chunk/PalettedContainer$Data storage Lnet/minecraft/util/collection/PaletteStorage;
+accessible method net/minecraft/world/chunk/PalettedContainer$PaletteProvider getBits (Lnet/minecraft/util/collection/IndexedIterable;I)I

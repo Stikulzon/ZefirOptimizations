@@ -139,7 +139,11 @@ public interface IAsyncLivingEntityAccess {
 
     float zefiroptimizations$calculateNextStepSoundDistance();
 
+    void zefiroptimizations$removePowderSnowSlow();
 
+    void zefiroptimizations$addPowderSnowSlowIfNeeded();
+
+    boolean zefiroptimizations$isImmobile();
 
     Vec3d zefiroptimizations$getPos();
 

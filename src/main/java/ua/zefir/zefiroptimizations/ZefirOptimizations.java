@@ -40,8 +40,8 @@ public class ZefirOptimizations implements ModInitializer {
 	private void onServerStarting(MinecraftServer server) {
 		SERVER = server;
 	}
-	private void onServerStarted(MinecraftServer server) {
 
+	private void onServerStarted(MinecraftServer server) {
 		ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 		executor.scheduleAtFixedRate(() -> {
 			if (SERVER != null) {

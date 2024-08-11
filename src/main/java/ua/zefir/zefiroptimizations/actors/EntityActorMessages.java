@@ -10,6 +10,7 @@ public final class EntityActorMessages {
     // Position Updates
     public record UpdatePosition(LivingEntity entity, Vec3d newPosition) {}
     public record SyncPosition(LivingEntity entity, Vec3d newPosition) {}
+    public record TickSingleEntity(LivingEntity entity) {}
     public record GetPosition() {}
     public record PositionResponse(Vec3d position) {}
 

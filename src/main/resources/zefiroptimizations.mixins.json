@@ -4,10 +4,14 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "BlockCollisionSpliteratorMixin",
+    "CheckedRandomMixin",
     "CollisionViewMixin",
+    "EntityListMixin",
     "EntityMixin",
     "EntityMixin1",
+    "EntityTrackingSectionMixin",
     "LivingEntityMixin",
+    "PalettedContainerMixin",
     "WorkStationCompetitionTaskMixin"
   ],
   "injectors": {

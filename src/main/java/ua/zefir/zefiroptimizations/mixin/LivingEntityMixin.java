@@ -10,8 +10,6 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
@@ -97,11 +95,32 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
     protected abstract float getBaseMovementSpeedMultiplier();
     @Shadow
     protected abstract void pushAway(Entity entity);
+    @Shadow
+    protected abstract void removePowderSnowSlow();
+    @Shadow
+    protected abstract void addPowderSnowSlowIfNeeded();
+    @Shadow
+    protected abstract boolean isImmobile();
+
+    @Override
+    public boolean zefiroptimizations$isImmobile() {
+        return this.isImmobile();
+    }
+
+    @Override
+    public void zefiroptimizations$removePowderSnowSlow() {
+        this.removePowderSnowSlow();
+    }
+
+    @Override
+    public void zefiroptimizations$addPowderSnowSlowIfNeeded() {
+        this.addPowderSnowSlowIfNeeded();
+    }
 
     @Override
     public boolean zefiroptimizations$shouldSwimInFluids() {
-                return this.shouldSwimInFluids();
-            }
+        return this.shouldSwimInFluids();
+    }
 
             @Override
     public boolean zefiroptimizations$isTouchingWater() {
@@ -444,7 +463,7 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
     // ------------------------------------------------------------------
 
     @Unique
-    private boolean isAsyncTicking = false;
+    private boolean isAsyncTicking = true;
 
     @Unique
     @Override
@@ -477,36 +496,37 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
         }
     }
 
-    @Redirect(method = "tickMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;travel(Lnet/minecraft/util/math/Vec3d;)V"))
-    private void zefiroptimizations$redirectTravel(LivingEntity instance, Vec3d movementInput) {
-        if (instance instanceof IAsyncTickingLivingEntity) {
+    @Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;tickMovement()V"))
+    private void zefiroptimizations$redirectTravel(LivingEntity instance) {
+        if (instance instanceof IAsyncTickingLivingEntity && !(instance instanceof PlayerEntity)) {
             // Prevent the original method from being called when async ticking
             // The movement logic is now handled by the EntityActor
+            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(instance), ActorRef.noSender());
         } else {
             // Call the original method when not async ticking
-            instance.travel(movementInput);
+            instance.tickMovement();
         }
     }
 
-    @Redirect(
-            method = "travel",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;applyFluidMovingSpeed(DZLnet/minecraft/util/math/Vec3d;)Lnet/minecraft/util/math/Vec3d;")
-    )
-    private Vec3d zefiroptimizations$redirectApplyFluidMovingSpeed(LivingEntity instance, double gravity, boolean falling, Vec3d motion) {
-        if (instance instanceof IAsyncTickingLivingEntity) {
-            // Prevent the original method from being called when async ticking
-            return motion;
-        } else {
-            return instance.applyFluidMovingSpeed(gravity, falling, motion);
-        }
-    }
-
-    @Redirect(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;move(Lnet/minecraft/entity/MovementType;Lnet/minecraft/util/math/Vec3d;)V"))
-    private void zefiroptimizations$redirectMove(LivingEntity instance, MovementType movementType, Vec3d movement) {
-        if (instance instanceof IAsyncTickingLivingEntity) {
-            // Prevent the original method from being called when async ticking
-        } else {
-            instance.move(movementType, movement);
-        }
-    }
+//    @Redirect(
+//            method = "travel",
+//            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;applyFluidMovingSpeed(DZLnet/minecraft/util/math/Vec3d;)Lnet/minecraft/util/math/Vec3d;")
+//    )
+//    private Vec3d zefiroptimizations$redirectApplyFluidMovingSpeed(LivingEntity instance, double gravity, boolean falling, Vec3d motion) {
+//        if (instance instanceof IAsyncTickingLivingEntity) {
+//            // Prevent the original method from being called when async ticking
+//            return motion;
+//        } else {
+//            return instance.applyFluidMovingSpeed(gravity, falling, motion);
+//        }
+//    }
+//
+//    @Redirect(method = "travel", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;move(Lnet/minecraft/entity/MovementType;Lnet/minecraft/util/math/Vec3d;)V"))
+//    private void zefiroptimizations$redirectMove(LivingEntity instance, MovementType movementType, Vec3d movement) {
+//        if (instance instanceof IAsyncTickingLivingEntity) {
+//            // Prevent the original method from being called when async ticking
+//        } else {
+//            instance.move(movementType, movement);
+//        }
+//    }
 }
