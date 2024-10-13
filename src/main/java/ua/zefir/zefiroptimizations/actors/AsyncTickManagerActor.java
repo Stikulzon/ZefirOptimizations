@@ -25,8 +25,11 @@ public class AsyncTickManagerActor extends AbstractActor {
                 .match(EntityActorMessages.AsyncTick.class, this::handleAsyncTick)
                 .match(EntityActorMessages.EntityCreated.class, this::handleEntityCreated)
                 .match(EntityActorMessages.EntityRemoved.class, this::handleEntityRemoved)
-//                .match(EntityActorMessages.SyncPosition.class, this::handleSyncPosition)
                 .match(EntityActorMessages.TickSingleEntity.class, this::handleAsyncSingleTick)
+                .match(EntityActorMessages.MainThreadCallback.class, msg -> {
+                    // Execute the callback on the Minecraft server thread
+                    ZefirOptimizations.SERVER.execute(() -> msg.callback().accept("Some result"));
+                })
                 .build();
     }
 
@@ -54,10 +57,9 @@ public class AsyncTickManagerActor extends AbstractActor {
     }
 
     private void handleEntityCreated(EntityActorMessages.EntityCreated msg) {
-
         LivingEntity entity = msg.entity();
-        ActorRef entityActor = getContext().actorOf(EntityActor.props(entity), "entityActor_" + entity.getUuid());
-        entityActors.put(entity, entityActor);
+        ActorRef entitySupervisor = getContext().actorOf(EntityActorSupervisor.props(entity), "entitySupervisor_" + entity.getUuid());
+        entityActors.put(entity, entitySupervisor); // Store the supervisor reference
     }
 
     private void handleEntityRemoved(EntityActorMessages.EntityRemoved msg) {
@@ -67,7 +69,4 @@ public class AsyncTickManagerActor extends AbstractActor {
             entityActor.tell(PoisonPill.getInstance(), getSelf()); // Send poison pill for self-termination
         }
     }
-
-//    private void handleSyncPosition(EntityActorMessages.SyncPosition msg) {
-//    }
 }

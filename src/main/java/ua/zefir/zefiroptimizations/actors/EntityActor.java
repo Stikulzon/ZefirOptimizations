@@ -36,6 +36,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.border.WorldBorder;
 import net.minecraft.world.event.GameEvent;
 import org.jetbrains.annotations.Nullable;
+import ua.zefir.zefiroptimizations.ZefirOptimizations;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,11 +45,9 @@ import java.util.concurrent.ThreadLocalRandom;
 @Getter
 @Setter
 public class EntityActor extends AbstractActor {
-    @Getter
-    private final LivingEntity entity;
-    @Getter
-    private final IAsyncLivingEntityAccess entityAccess;
-    private final ThreadLocalRandom random = ThreadLocalRandom.current();
+    protected final LivingEntity entity;
+    protected final IAsyncLivingEntityAccess entityAccess;
+    protected final ThreadLocalRandom random = ThreadLocalRandom.current();
 
     public EntityActor(LivingEntity entity) {
         this.entity = entity;
@@ -68,8 +67,12 @@ public class EntityActor extends AbstractActor {
 
     protected void handleAsyncTick(EntityActorMessages.AsyncTick msg) {
             if (!entity.isRemoved()) {
-                this.tickMovement();
+                this.tickMobEntityMovement();
             }
+    }
+
+    public void tickMobEntityMovement() {
+        tickMovement();
     }
 
     protected void tickMovement() {
@@ -118,7 +121,13 @@ public class EntityActor extends AbstractActor {
             entity.forwardSpeed = 0.0F;
         } else if (entity.canMoveVoluntarily()) {
             entity.getWorld().getProfiler().push("newAi");
-            entityAccess.zefiroptimizations$tickNewAi();
+//            entityAccess.zefiroptimizations$tickNewAi();
+            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.MainThreadCallback(result -> {
+                // This code runs on the MAIN SERVER THREAD! Be very careful!
+                // Do not block this thread or you will freeze the server.
+                entityAccess.zefiroptimizations$tickNewAi();
+                ZefirOptimizations.LOGGER.info("Result from actor: " + result);
+            }), getSelf());
             entity.getWorld().getProfiler().pop();
         }
 

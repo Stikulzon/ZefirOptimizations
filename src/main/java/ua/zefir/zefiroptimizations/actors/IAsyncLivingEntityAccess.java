@@ -2,15 +2,13 @@ package ua.zefir.zefiroptimizations.actors;
 
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MovementType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.sound.SoundEvent;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.*;
 
 public interface IAsyncLivingEntityAccess {
     Vec3d zefiroptimizations$getControlledMovementInput(PlayerEntity controllingPlayer, Vec3d movementInput);
@@ -21,7 +19,13 @@ public interface IAsyncLivingEntityAccess {
 
     boolean zefiroptimizations$shouldSwimInFluids();
 
+    Vec3i zefiroptimizations$getItemPickUpRangeExpander();
+
+    void zefiroptimizations$loot(ItemEntity item);
+
     boolean zefiroptimizations$isTouchingWater();
+
+    void zefiroptimizations$updateGoalControls();
 
     SoundEvent zefiroptimizations$getFallSound(int distance);
 

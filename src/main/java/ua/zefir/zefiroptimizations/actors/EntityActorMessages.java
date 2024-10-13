@@ -13,6 +13,7 @@ public final class EntityActorMessages {
     public record TickSingleEntity(LivingEntity entity) {}
     public record GetPosition() {}
     public record PositionResponse(Vec3d position) {}
+    public record MainThreadCallback(java.util.function.Consumer<Object> callback) {}
 
     // Damage
     public record ApplyDamage(float amount, DamageSource source) {}

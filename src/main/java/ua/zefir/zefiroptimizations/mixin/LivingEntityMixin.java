@@ -6,6 +6,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MovementType;
+import net.minecraft.entity.decoration.ArmorStandEntity;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -493,15 +495,17 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
         isAsyncTicking = asyncTicking;
     }
 
-    @Inject(method = "<init>", at = @At("RETURN"))
-    private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        zefiroptimizations$setAsyncTicking(true);
-        if (!world.isClient) {
-            ZefirOptimizations.getAsyncTickManager()
-                    .tell(new EntityActorMessages.EntityCreated(self), ActorRef.noSender());
-        }
-    }
+//    @Inject(method = "<init>", at = @At("RETURN"))
+//    private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
+//        LivingEntity self = (LivingEntity) (Object) this;
+//        if(self instanceof ArmorStandEntity) {
+//            zefiroptimizations$setAsyncTicking(true);
+//            if (!world.isClient) {
+//                ZefirOptimizations.getAsyncTickManager()
+//                        .tell(new EntityActorMessages.EntityCreated(self), ActorRef.noSender());
+//            }
+//        }
+//    }
 
     @Inject(method = "remove", at = @At("HEAD"))
     private void onRemove(Entity.RemovalReason reason, CallbackInfo ci) {
@@ -525,11 +529,14 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
 //    }
 
     @Inject(method = "tickMovement", at = @At("HEAD"), cancellable = true)
-    private void onRemove(CallbackInfo ci) {
+    private void onTickMovement(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if (!(self instanceof PlayerEntity)) {
+        if (self instanceof ArmorStandEntity) {
             ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
             ci.cancel();
+//        } else if (self instanceof MobEntity) {
+//            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
+//            ci.cancel();
         }
     }
 }
