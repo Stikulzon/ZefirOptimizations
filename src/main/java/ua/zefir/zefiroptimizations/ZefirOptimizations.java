@@ -33,8 +33,6 @@ public class ZefirOptimizations implements ModInitializer {
 
 		ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
 		ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
-
-//		Commands.registerCommands();
 	}
 
 	private void onServerStarting(MinecraftServer server) {

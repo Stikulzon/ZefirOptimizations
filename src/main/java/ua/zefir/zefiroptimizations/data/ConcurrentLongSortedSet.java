@@ -70,11 +70,6 @@ public class ConcurrentLongSortedSet extends AbstractLongSortedSet {
     }
 
     @Override
-    public boolean rem(long e) {
-        return set.remove(e);
-    }
-
-    @Override
     public boolean contains(long e) {
         return set.contains(e);
     }

@@ -3,25 +3,20 @@ package ua.zefir.zefiroptimizations.mixin;
 import akka.actor.ActorRef;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.MovementType;
 import net.minecraft.entity.decoration.ArmorStandEntity;
-import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.actors.*;
@@ -515,18 +510,6 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
                     .tell(new EntityActorMessages.EntityRemoved(self), ActorRef.noSender());
         }
     }
-
-//    @Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;tickMovement()V"))
-//    private void zefiroptimizations$redirectTravel(LivingEntity instance) {
-//        if (!(instance instanceof PlayerEntity)) {
-//            // Prevent the original method from being called when async ticking
-//            // The movement logic is now handled by the EntityActor
-//            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(instance), ActorRef.noSender());
-//        } else {
-//            // Call the original method when not async ticking
-//            instance.tickMovement();
-//        }
-//    }
 
     @Inject(method = "tickMovement", at = @At("HEAD"), cancellable = true)
     private void onTickMovement(CallbackInfo ci) {

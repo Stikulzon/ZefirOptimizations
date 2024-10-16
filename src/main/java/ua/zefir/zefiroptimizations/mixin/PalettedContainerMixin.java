@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.IntUnaryOperator;
@@ -84,7 +85,7 @@ public abstract class PalettedContainerMixin<T> implements PaletteResizeListener
     public void readPacket(PacketByteBuf buf) {
         int i = buf.readByte();
         PalettedContainer.Data<T> data = this.getCompatibleData(null, i);
-        data.palette.readPacket(buf);
+        Objects.requireNonNull(data).palette.readPacket(buf);
         buf.readLongArray(data.storage.getData());
         this.data = data;
     }
@@ -120,7 +121,7 @@ public abstract class PalettedContainerMixin<T> implements PaletteResizeListener
             optional = Optional.empty();
         }
 
-        return new ReadableContainer.Serialized(biMapPalette.getElements(), optional);
+        return new ReadableContainer.Serialized<>(biMapPalette.getElements(), optional);
     }
 
 

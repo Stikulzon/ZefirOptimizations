@@ -1,7 +1,6 @@
 package ua.zefir.zefiroptimizations.mixin;
 
 import net.minecraft.util.math.random.GaussianGenerator;
-import net.minecraft.world.entity.EntityTrackingStatus;
 import org.spongepowered.asm.mixin.*;
 import net.minecraft.util.math.random.CheckedRandom;
 import org.spongepowered.asm.mixin.injection.At;

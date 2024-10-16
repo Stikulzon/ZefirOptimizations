@@ -1,16 +1,12 @@
 package ua.zefir.zefiroptimizations.mixin;
 
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
-import com.mojang.logging.LogUtils;
-import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.util.TypeFilter;
 import net.minecraft.util.function.LazyIterationConsumer;
 import net.minecraft.world.entity.EntityIndex;
 import net.minecraft.world.entity.EntityLike;
-import net.minecraft.world.entity.EntityTrackingStatus;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.*;

@@ -11,7 +11,6 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.mob.MobEntity;
 import scala.concurrent.duration.Duration;
-import ua.zefir.zefiroptimizations.ZefirOptimizations;
 
 import java.util.concurrent.TimeUnit;
 
@@ -31,10 +30,10 @@ public class EntityActorSupervisor extends AbstractActor {
     public EntityActorSupervisor(LivingEntity entity) {
         String actorName = "entityActor_" + entity.getUuid();
 
-        if (getContext().findChild(actorName).isPresent()) {
-            LOGGER.warn("Actor with name {} already exists. This could indicate a problem with entity lifecycle management.", actorName);
-            LOGGER.warn("Entity details: {}", entity);
-        }
+//        if (getContext().findChild(actorName).isPresent()) {
+//            LOGGER.warn("Actor with name {} already exists. This could indicate a problem with entity lifecycle management.", actorName);
+//            LOGGER.warn("Entity details: {}", entity);
+//        }
 
         entityActor = getContext().findChild(actorName).orElseGet(() -> {
             if (entity instanceof MobEntity) {

@@ -43,7 +43,7 @@ public class MobEntityActor extends EntityActor {
                 Vec3i vec3i = entityAccess.zefiroptimizations$getItemPickUpRangeExpander();
 
                 for (ItemEntity itemEntity : mobEntity.getWorld()
-                        .getNonSpectatingEntities(ItemEntity.class, mobEntity.getBoundingBox().expand((double) vec3i.getX(), (double) vec3i.getY(), (double) vec3i.getZ()))) {
+                        .getNonSpectatingEntities(ItemEntity.class, mobEntity.getBoundingBox().expand(vec3i.getX(), vec3i.getY(), vec3i.getZ()))) {
                     if (!itemEntity.isRemoved() && !itemEntity.getStack().isEmpty() && !itemEntity.cannotPickup() && mobEntity.canGather(itemEntity.getStack())) {
                         entityAccess.zefiroptimizations$loot(itemEntity);
                     }

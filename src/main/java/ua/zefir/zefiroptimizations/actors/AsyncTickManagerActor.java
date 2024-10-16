@@ -15,7 +15,7 @@ import static ua.zefir.zefiroptimizations.ZefirOptimizations.LOGGER;
 
 public class AsyncTickManagerActor extends AbstractActor {
     private final Map<LivingEntity, ActorRef> entityActors = new HashMap<>();
-    private final Set<UUID> pendingRemoval = new HashSet<>();
+//    private final Set<UUID> pendingRemoval = new HashSet<>();
 
     public static Props props() {
         return Props.create(AsyncTickManagerActor.class);
@@ -28,16 +28,13 @@ public class AsyncTickManagerActor extends AbstractActor {
                 .match(EntityActorMessages.EntityCreated.class, this::handleEntityCreated)
                 .match(EntityActorMessages.EntityRemoved.class, this::handleEntityRemoved)
                 .match(EntityActorMessages.TickSingleEntity.class, this::handleAsyncSingleTick)
-//                .match(EntityActorMessages.MainThreadCallback.class, msg -> {
-//                    // Execute the callback on the Minecraft server thread
-//                    ZefirOptimizations.SERVER.execute(() -> msg.callback().accept("Some result"));
-//                })
                 .build();
     }
 
     private void handleAsyncTick(EntityActorMessages.AsyncTick msg) {
         ServerWorld world = ZefirOptimizations.SERVER.getOverworld();
 
+        // TODO: there are better way to handle it
         for (LivingEntity entity : world.getEntitiesByType(
                 TypeFilter.instanceOf(LivingEntity.class),
                 e -> e instanceof LivingEntity)) {
@@ -60,10 +57,10 @@ public class AsyncTickManagerActor extends AbstractActor {
 
     private void handleEntityCreated(EntityActorMessages.EntityCreated msg) {
         LivingEntity entity = msg.entity();
-        if (pendingRemoval.contains(entity.getUuid())) { // Check pending removal
-            pendingRemoval.remove(entity.getUuid()); // Remove from pending
-            return; // Don't create the actor yet
-        }
+//        if (pendingRemoval.contains(entity.getUuid())) {
+//            pendingRemoval.remove(entity.getUuid());
+//            return;
+//        }
 
         String actorName = "entitySupervisor_" + entity.getUuid();
 
@@ -73,16 +70,16 @@ public class AsyncTickManagerActor extends AbstractActor {
         }
 
         ActorRef entitySupervisor = getContext().findChild(actorName).orElseGet(() -> getContext().actorOf(EntityActorSupervisor.props(entity), actorName));
-        entityActors.put(entity, entitySupervisor); // Store the supervisor reference
+        entityActors.put(entity, entitySupervisor);
     }
 
     private void handleEntityRemoved(EntityActorMessages.EntityRemoved msg) {
         LivingEntity entity = msg.entity();
 //        ZefirOptimizations.LOGGER.info("EntityRemoved: {}", entity.getUuid());
-        pendingRemoval.add(entity.getUuid()); // Add to pending removal
+//        pendingRemoval.add(entity.getUuid());
         ActorRef entityActor = entityActors.get(entity);
         if (entityActor != null) {
-            entityActor.tell(PoisonPill.getInstance(), getSelf()); // Send poison pill for self-termination
+            entityActor.tell(PoisonPill.getInstance(), getSelf());
         }
     }
 }
