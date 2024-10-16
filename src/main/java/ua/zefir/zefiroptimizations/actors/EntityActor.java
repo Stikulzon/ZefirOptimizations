@@ -62,6 +62,8 @@ public class EntityActor extends AbstractActor {
     public Receive createReceive() {
         return receiveBuilder()
                 .match(EntityActorMessages.AsyncTick.class, this::handleAsyncTick)
+                .match(EntityActorMessages.ContinueTickMovement.class, this::continueTickMovement) // Handle the continuation message
+//                .match(EntityActorMessages.ContinueTickMovement.class, this::handleContinueTickMovement)
                 .build();
     }
 
@@ -120,17 +122,24 @@ public class EntityActor extends AbstractActor {
             entity.sidewaysSpeed = 0.0F;
             entity.forwardSpeed = 0.0F;
         } else if (entity.canMoveVoluntarily()) {
-            entity.getWorld().getProfiler().push("newAi");
+//            entity.getWorld().getProfiler().push("newAi");
 //            entityAccess.zefiroptimizations$tickNewAi();
-            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.MainThreadCallback(result -> {
-                // This code runs on the MAIN SERVER THREAD! Be very careful!
-                // Do not block this thread or you will freeze the server.
-                entityAccess.zefiroptimizations$tickNewAi();
-                ZefirOptimizations.LOGGER.info("Result from actor: " + result);
-            }), getSelf());
-            entity.getWorld().getProfiler().pop();
+//            entity.getWorld().getProfiler().pop();
+            ZefirOptimizations.getMainThreadActor().tell(
+                    new EntityActorMessages.TickNewAiAndContinue(getSelf(), entity),
+                    getSelf()
+            );
+//            ZefirOptimizations.LOGGER.info("Test");
+            return;
         }
+//        continueTickMovement();
+        this.getSelf().tell(new EntityActorMessages.ContinueTickMovement(), getSelf());
+    }
 
+    protected void continueTickMovement(EntityActorMessages.ContinueTickMovement msg) {
+        if (entity.isRemoved()) {
+            return;
+        }
         entity.getWorld().getProfiler().pop();
         entity.getWorld().getProfiler().push("jump");
         if (entityAccess.zefiroptimizations$isJumping() && entityAccess.zefiroptimizations$shouldSwimInFluids()) {

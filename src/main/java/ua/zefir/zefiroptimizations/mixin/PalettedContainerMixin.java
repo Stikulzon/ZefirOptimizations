@@ -33,7 +33,7 @@ public abstract class PalettedContainerMixin<T> implements PaletteResizeListener
     @Shadow private static <T> void applyEach(int[] is, IntUnaryOperator applier) {}
 
 //    /**
-//     * @author Your Name
+//     * @author Zefir
 //     * @reason Thread-safe implementation without locks
 //     */
 //    @Overwrite

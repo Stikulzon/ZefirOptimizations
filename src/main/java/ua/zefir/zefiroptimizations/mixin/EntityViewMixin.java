@@ -12,12 +12,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Mixin(EntityView.class)
 public interface EntityViewMixin {
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityList usage implementation
+     */
     @Overwrite
     @Nullable
     default <T extends LivingEntity> T getClosestEntity(
             List<? extends T> entityList, TargetPredicate targetPredicate, @Nullable LivingEntity entity, double x, double y, double z
     ) {
-        // Create a thread-safe copy of the list for iteration
         List<? extends T> safeEntityList = new CopyOnWriteArrayList<>(entityList);
 
         double d = -1.0;

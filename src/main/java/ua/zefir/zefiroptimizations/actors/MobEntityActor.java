@@ -20,6 +20,7 @@ public class MobEntityActor extends EntityActor {
     public Receive createReceive() {
         return receiveBuilder()
                 .match(EntityActorMessages.AsyncTick.class, this::handleAsyncTick)
+                .match(EntityActorMessages.ContinueTickMovement.class, this::continueTickMovement)
                 .build();
     }
 
@@ -32,7 +33,7 @@ public class MobEntityActor extends EntityActor {
 
     @Override
     public void tickMobEntityMovement() {
-        long millis = System.currentTimeMillis();
+//        long millis = System.currentTimeMillis();
         super.tickMobEntityMovement();
 
         if(this.entity instanceof MobEntity mobEntity) {
@@ -56,9 +57,9 @@ public class MobEntityActor extends EntityActor {
                 ((IAsyncLivingEntityAccess) mobEntity).zefiroptimizations$updateGoalControls();
             }
         }
-        long tickTake = System.currentTimeMillis() - millis;
-        if(tickTake>20) {
-            System.out.println("tick take: " + tickTake);
-        }
+//        long tickTake = System.currentTimeMillis() - millis;
+//        if(tickTake>20) {
+//            System.out.println("tick take: " + tickTake);
+//        }
     }
 }

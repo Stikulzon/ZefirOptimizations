@@ -11,12 +11,14 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.mob.MobEntity;
 import scala.concurrent.duration.Duration;
+import ua.zefir.zefiroptimizations.ZefirOptimizations;
 
 import java.util.concurrent.TimeUnit;
 
 import static akka.actor.SupervisorStrategy.escalate;
 import static akka.actor.SupervisorStrategy.restart;
 import static akka.actor.SupervisorStrategy.resume;
+import static ua.zefir.zefiroptimizations.ZefirOptimizations.LOGGER;
 
 public class EntityActorSupervisor extends AbstractActor {
 
@@ -27,13 +29,22 @@ public class EntityActorSupervisor extends AbstractActor {
     }
 
     public EntityActorSupervisor(LivingEntity entity) {
-        if(entity instanceof MobEntity) {
-            this.entityActor = getContext().actorOf(MobEntityActor.props(entity), "entityActor_" + entity.getUuid());
-        } else if(entity instanceof ArmorStandEntity) {
-            this.entityActor = getContext().actorOf(ArmorStandEntityActor.props(entity), "entityActor_" + entity.getUuid());
-        } else {
-            this.entityActor = getContext().actorOf(EntityActor.props(entity), "entityActor_" + entity.getUuid());
+        String actorName = "entityActor_" + entity.getUuid();
+
+        if (getContext().findChild(actorName).isPresent()) {
+            LOGGER.warn("Actor with name {} already exists. This could indicate a problem with entity lifecycle management.", actorName);
+            LOGGER.warn("Entity details: {}", entity);
         }
+
+        entityActor = getContext().findChild(actorName).orElseGet(() -> {
+            if (entity instanceof MobEntity) {
+                return getContext().actorOf(MobEntityActor.props(entity), actorName);
+            } else if (entity instanceof ArmorStandEntity) {
+                return getContext().actorOf(ArmorStandEntityActor.props(entity), actorName);
+            } else {
+                return getContext().actorOf(EntityActor.props(entity), actorName);
+            }
+        });
     }
 
     @Override

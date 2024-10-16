@@ -1,167 +1,180 @@
 package ua.zefir.zefiroptimizations.mixin;
 
-import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.LongSet;
+
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
+
+import it.unimi.dsi.fastutil.longs.LongSortedSet;
 import net.minecraft.util.TypeFilter;
 import net.minecraft.util.function.LazyIterationConsumer;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.entity.EntityLike;
 import net.minecraft.world.entity.EntityTrackingSection;
 import net.minecraft.world.entity.EntityTrackingStatus;
 import net.minecraft.world.entity.SectionedEntityCache;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.*;
+import ua.zefir.zefiroptimizations.data.ConcurrentLongSortedSet;
 
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-@Mixin(SectionedEntityCache.class)
+@Mixin(value = SectionedEntityCache.class, priority = 800)
 public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
-    @Shadow @Final private Long2ObjectMap<EntityTrackingSection<T>> trackingSections;
+    @Final
+    @Shadow
+    private Class<T> entityClass;
+    @Final
+    @Shadow
+    private Long2ObjectFunction<EntityTrackingStatus> posToStatus;
     @Unique
-    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    private final ConcurrentHashMap<Long, EntityTrackingSection<T>> trackingSections = new ConcurrentHashMap<>();
+    @Unique
+    private final ConcurrentLongSortedSet trackedPositions = new ConcurrentLongSortedSet();
 
-    @Inject(method = "<init>", at = @At("RETURN"))
-    private void onInit(Class<T> entityClass, Long2ObjectFunction<EntityTrackingStatus> chunkStatusDiscriminator, CallbackInfo ci) {
-        // You can initialize the lock here if needed
-    }
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    public void forEachInBox(Box box, LazyIterationConsumer<EntityTrackingSection<T>> consumer) {
+        int i = 2;
+        int j = ChunkSectionPos.getSectionCoord(box.minX - 2.0);
+        int k = ChunkSectionPos.getSectionCoord(box.minY - 4.0);
+        int l = ChunkSectionPos.getSectionCoord(box.minZ - 2.0);
+        int m = ChunkSectionPos.getSectionCoord(box.maxX + 2.0);
+        int n = ChunkSectionPos.getSectionCoord(box.maxY + 0.0);
+        int o = ChunkSectionPos.getSectionCoord(box.maxZ + 2.0);
 
-    @Inject(method = "forEachInBox", at = @At("HEAD"))
-    private void onForEachInBox(Box box, LazyIterationConsumer<EntityTrackingSection<T>> consumer, CallbackInfo ci) {
-        lock.readLock().lock();
-    }
-
-    @Inject(method = "forEachInBox", at = @At("TAIL"))
-    private void onForEachInBoxTail(Box box, LazyIterationConsumer<EntityTrackingSection<T>> consumer, CallbackInfo ci) {
-        lock.readLock().unlock();
-    }
-
-    @Inject(method = "getSections(J)Ljava/util/stream/LongStream;", at = @At("HEAD"))
-    private void onGetSections(long chunkPos, CallbackInfoReturnable<LongStream> cir) {
-        lock.readLock().lock();
-    }
-
-    @ModifyReturnValue(method = "getSections(J)Ljava/util/stream/LongStream;", at = @At(value = "RETURN", ordinal = 0))
-    private LongStream onGetSectionsReturn1(LongStream original) {
-        try{
-            return original;
-        } finally {
-            lock.readLock().unlock();
+        for (int p = j; p <= m; p++) {
+            long q = ChunkSectionPos.asLong(p, 0, 0);
+            long r = ChunkSectionPos.asLong(p, -1, -1);
+            // Use a snapshot for consistent iteration
+            LongSortedSet subSet = trackedPositions.subSet(q, r + 1L);
+            for (Long s : subSet) {
+                int t = ChunkSectionPos.unpackY(s);
+                int u = ChunkSectionPos.unpackZ(s);
+                if (t >= k && t <= n && u >= l && u <= o) {
+                    EntityTrackingSection<T> entityTrackingSection = this.trackingSections.get(s);
+                    if (entityTrackingSection != null
+                            && !entityTrackingSection.isEmpty()
+                            && entityTrackingSection.getStatus().shouldTrack()
+                            && consumer.accept(entityTrackingSection).shouldAbort()) {
+                        return;
+                    }
+                }
+            }
         }
     }
 
-    @ModifyReturnValue(method = "getSections(J)Ljava/util/stream/LongStream;", at = @At(value = "RETURN", ordinal = 1))
-    private LongStream onGetSectionsReturn2(LongStream original) {
-        try{
-            return original;
-        } finally {
-            lock.readLock().unlock();
-        }
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    public LongStream getSections(long chunkPos) {
+        int i = ChunkPos.getPackedX(chunkPos);
+        int j = ChunkPos.getPackedZ(chunkPos);
+        return this.getSections(i, j).stream().mapToLong(Long::longValue);
     }
 
-    @Inject(method = "getTrackingSections", at = @At("HEAD"))
-    private void onGetTrackingSections(long chunkPos, CallbackInfoReturnable<Stream<EntityTrackingSection<T>>> cir) {
-        lock.readLock().lock();
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    private LongSortedSet getSections(int chunkX, int chunkZ) {
+        long l = ChunkSectionPos.asLong(chunkX, 0, chunkZ);
+        long m = ChunkSectionPos.asLong(chunkX, -1, chunkZ);
+        return this.trackedPositions.subSet(l, m + 1L);
     }
 
-    @ModifyReturnValue(method = "getTrackingSections", at = @At("RETURN"))
-    private Stream<EntityTrackingSection<T>> onGetTrackingSectionsReturn(Stream<EntityTrackingSection<T>> original) {
-        try{
-            return original;
-        } finally {
-            lock.readLock().unlock();
-        }
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    public Stream<EntityTrackingSection<T>> getTrackingSections(long chunkPos) {
+        return this.getSections(chunkPos).mapToObj(this.trackingSections::get).filter(Objects::nonNull);
     }
 
-    @Inject(method = "getTrackingSection", at = @At("HEAD"))
-    private void onGetTrackingSection(long sectionPos, CallbackInfoReturnable<EntityTrackingSection<T>> cir) {
-        lock.writeLock().lock();
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    public EntityTrackingSection<T> getTrackingSection(long sectionPos) {
+        return this.trackingSections.computeIfAbsent(sectionPos, this::addSection);
     }
 
-    @ModifyReturnValue(method = "getTrackingSection", at = @At("RETURN"))
-    private EntityTrackingSection<T> onGetTrackingSectionReturn(EntityTrackingSection<T> original) {
-        try{
-            return original;
-        } finally {
-            lock.writeLock().unlock();
-        }
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    @Nullable
+    public EntityTrackingSection<T> findTrackingSection(long sectionPos) {
+        return this.trackingSections.get(sectionPos);
     }
 
-    @Inject(method = "findTrackingSection", at = @At("HEAD"))
-    private void onFindTrackingSection(long sectionPos, CallbackInfoReturnable<EntityTrackingSection<T>> cir) {
-        lock.readLock().lock();
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    private EntityTrackingSection<T> addSection(long sectionPos) {
+        long l = chunkPosFromSectionPos(sectionPos);
+        EntityTrackingStatus entityTrackingStatus = this.posToStatus.get(l);
+        this.trackedPositions.add(sectionPos);
+        return new EntityTrackingSection<>(this.entityClass, entityTrackingStatus);
     }
 
-    @ModifyReturnValue(method = "findTrackingSection", at = @At("RETURN"))
-    private @Nullable EntityTrackingSection<T> onFindTrackingSectionReturn(@Nullable EntityTrackingSection<T> original) {
-        try{
-            return original;
-        } finally {
-            lock.readLock().unlock();
-        }
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    public void forEachIntersects(Box box, LazyIterationConsumer<T> consumer) {
+        this.forEachInBox(box, section -> section.forEach(box, consumer));
     }
 
-    @Inject(method = "getChunkPositions", at = @At("HEAD"))
-    private void onGetChunkPositions(CallbackInfoReturnable<LongSet> cir) {
-        lock.readLock().lock();
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    public <U extends T> void forEachIntersects(TypeFilter<T, U> filter, Box box, LazyIterationConsumer<U> consumer) {
+        this.forEachInBox(box, section -> section.forEach(filter, box, consumer));
     }
 
-    @Inject(method = "getChunkPositions", at = @At("RETURN"))
-    private void onGetChunkPositionsReturn(CallbackInfoReturnable<LongSet> cir) {
-        lock.readLock().unlock();
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @Overwrite
+    public void removeSection(long sectionPos) {
+        this.trackingSections.computeIfPresent(sectionPos, (key, value) -> {
+            trackedPositions.remove(key);
+            return null;
+        });
     }
 
-    @Inject(method = "forEachIntersects(Lnet/minecraft/util/math/Box;Lnet/minecraft/util/function/LazyIterationConsumer;)V", at = @At("HEAD"))
-    private void onForEachIntersects(Box box, LazyIterationConsumer<T> consumer, CallbackInfo ci) {
-        lock.readLock().lock();
+    /**
+     * @author Zefir
+     * @reason Thread-safe SectionedEntityCache operations implementation
+     */
+    @net.minecraft.util.annotation.Debug
+    @Overwrite
+    @Debug
+    public int sectionCount() {
+        return this.trackedPositions.size();
     }
 
-    @Inject(method = "forEachIntersects(Lnet/minecraft/util/math/Box;Lnet/minecraft/util/function/LazyIterationConsumer;)V", at = @At("TAIL"))
-    private void onForEachIntersectsTail(Box box, LazyIterationConsumer<T> consumer, CallbackInfo ci) {
-        lock.readLock().unlock();
-    }
 
-    @Inject(method = "forEachIntersects(Lnet/minecraft/util/TypeFilter;Lnet/minecraft/util/math/Box;Lnet/minecraft/util/function/LazyIterationConsumer;)V", at = @At("HEAD"))
-    private <U extends T> void onForEachIntersectsTyped(TypeFilter<T, U> filter, Box box, LazyIterationConsumer<U> consumer, CallbackInfo ci) {
-        lock.readLock().lock();
-    }
-
-    @Inject(method = "forEachIntersects(Lnet/minecraft/util/TypeFilter;Lnet/minecraft/util/math/Box;Lnet/minecraft/util/function/LazyIterationConsumer;)V", at = @At("TAIL"))
-    private <U extends T> void onForEachIntersectsTypedTail(TypeFilter<T, U> filter, Box box, LazyIterationConsumer<U> consumer, CallbackInfo ci) {
-        lock.readLock().unlock();
-    }
-
-    @Inject(method = "removeSection", at = @At("HEAD"))
-    private void onRemoveSection(long sectionPos, CallbackInfo ci) {
-        lock.writeLock().lock();
-    }
-
-    @Inject(method = "removeSection", at = @At("TAIL"))
-    private void onRemoveSectionTail(long sectionPos, CallbackInfo ci) {
-        lock.writeLock().unlock();
-    }
-
-    @Inject(method = "sectionCount", at = @At("HEAD"))
-    private void onSectionCount(CallbackInfoReturnable<Integer> cir) {
-        lock.readLock().lock();
-    }
-
-    @ModifyReturnValue(method = "sectionCount", at = @At("RETURN"))
-    private int onSectionCountReturn(int original) {
-        try{
-            return original;
-        } finally {
-            lock.readLock().unlock();
-        }
+    @Shadow
+    private static long chunkPosFromSectionPos(long sectionPos) {
+        throw new UnsupportedOperationException();
     }
 }

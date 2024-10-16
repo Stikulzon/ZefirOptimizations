@@ -27,12 +27,20 @@ public class CheckedRandomMixin {
         threadLocalGaussianGenerator = ThreadLocal.withInitial(() -> new GaussianGenerator((CheckedRandom) (Object) this));
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe CheckedRandom operations implementation
+     */
     @Overwrite
     public void setSeed(long seed) {
         this.threadLocalSeed.get().set((seed ^ 25214903917L) & 281474976710655L);
         this.threadLocalGaussianGenerator.get().reset();
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe CheckedRandom operations implementation
+     */
     @Overwrite
     public int next(int bits) {
         AtomicLong seed = this.threadLocalSeed.get();
@@ -42,10 +50,12 @@ public class CheckedRandomMixin {
         return (int)(m >> 48 - bits);
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe CheckedRandom operations implementation
+     */
     @Overwrite
     public double nextGaussian() {
         return this.threadLocalGaussianGenerator.get().next();
     }
-
-
 }

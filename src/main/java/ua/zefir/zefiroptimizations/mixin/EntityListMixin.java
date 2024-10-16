@@ -15,6 +15,10 @@ public class EntityListMixin {
     @Shadow
     private Int2ObjectMap<Entity> entities;
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityList operations implementation
+     */
     @Overwrite
     public void add(Entity entity) {
         Int2ObjectMap<Entity> newEntities = new Int2ObjectLinkedOpenHashMap<>(this.entities);
@@ -22,6 +26,10 @@ public class EntityListMixin {
         this.entities = newEntities;
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityList operations implementation
+     */
     @Overwrite
     public void remove(Entity entity) {
         Int2ObjectMap<Entity> newEntities = new Int2ObjectLinkedOpenHashMap<>(this.entities);
@@ -29,18 +37,18 @@ public class EntityListMixin {
         this.entities = newEntities;
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityList operations implementation
+     */
     @Overwrite
     public boolean has(Entity entity) {
         return this.entities.containsKey(entity.getId());
     }
 
     /**
-     * Runs an {@code action} on every entity in this storage.
-     *
-     * <p>If this storage is updated during the iteration, the iteration will
-     * not be updated to reflect updated contents. For example, if an entity
-     * is added by the {@code action}, the {@code action} won't run on that
-     * entity later.
+     * @author Zefir
+     * @reason Thread-safe EntityList operations implementation
      */
     @Overwrite
     public void forEach(Consumer<Entity> action) {

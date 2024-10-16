@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Mixin(EntityIndex.class)
 public class EntityIndexMixin<T extends EntityLike> {
@@ -44,53 +43,75 @@ public class EntityIndexMixin<T extends EntityLike> {
         this.uuidToEntity = new ConcurrentHashMap<>();
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityIndex operations implementation
+     */
     @Overwrite
     public <U extends T> void forEach(TypeFilter<T, U> filter, LazyIterationConsumer<U> consumer) {
-        // Create a thread-safe snapshot of the values for iteration
         for (T entityLike : Collections.unmodifiableCollection(idToEntity.values())) {
-            U entityLike2 = (U)filter.downcast(entityLike);
+            U entityLike2 = filter.downcast(entityLike);
             if (entityLike2 != null && consumer.accept(entityLike2).shouldAbort()) {
                 return;
             }
         }
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityIndex operations implementation
+     */
     @Overwrite
     public Iterable<T> iterate() {
-        // Return an unmodifiable iterable of a thread-safe snapshot
         return Iterables.unmodifiableIterable(Collections.unmodifiableCollection(this.idToEntity.values()));
     }
 
-    public void add(T entity) {
-        UUID uUID = entity.getUuid();
-        if (this.uuidToEntity.containsKey(uUID)) {
-            LOGGER.warn("Duplicate entity UUID {}: {}", uUID, entity);
-        } else {
-            this.uuidToEntity.put(uUID, entity);
-            this.idToEntity.put(entity.getId(), entity); // ConcurrentHashMap handles concurrent put operations
-        }
-    }
+//    public void add(T entity) {
+//        UUID uUID = entity.getUuid();
+//        if (this.uuidToEntity.containsKey(uUID)) {
+//            LOGGER.warn("Duplicate entity UUID {}: {}", uUID, entity);
+//        } else {
+//            this.uuidToEntity.put(uUID, entity);
+//            this.idToEntity.put(entity.getId(), entity);
+//        }
+//    }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityIndex operations implementation
+     */
     @Overwrite
     public void remove(T entity) {
-        this.uuidToEntity.remove(entity.getUuid()); // ConcurrentHashMap handles concurrent remove operations
-        this.idToEntity.remove(entity.getId()); // Int2ObjectOpenHashMap is not thread-safe, but removal is less likely to cause issues compared to iteration
+        this.uuidToEntity.remove(entity.getUuid());
+        this.idToEntity.remove(entity.getId());
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityIndex operations implementation
+     */
     @Overwrite
     @Nullable
     public T get(int id) {
-        return this.idToEntity.get(id); // Int2ObjectOpenHashMap is not thread-safe, but single get operations are generally safe
+        return this.idToEntity.get(id);
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityIndex operations implementation
+     */
     @Overwrite
     @Nullable
     public T get(UUID uuid) {
-        return (T)this.uuidToEntity.get(uuid); // ConcurrentHashMap handles concurrent get operations
+        return (T)this.uuidToEntity.get(uuid);
     }
 
+    /**
+     * @author Zefir
+     * @reason Thread-safe EntityIndex operations implementation
+     */
     @Overwrite
     public int size() {
-        return this.uuidToEntity.size(); // ConcurrentHashMap handles concurrent size retrieval
+        return this.uuidToEntity.size();
     }
 }

@@ -9,11 +9,13 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.TypeFilter;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+
+import static ua.zefir.zefiroptimizations.ZefirOptimizations.LOGGER;
 
 public class AsyncTickManagerActor extends AbstractActor {
     private final Map<LivingEntity, ActorRef> entityActors = new HashMap<>();
+    private final Set<UUID> pendingRemoval = new HashSet<>();
 
     public static Props props() {
         return Props.create(AsyncTickManagerActor.class);
@@ -26,10 +28,10 @@ public class AsyncTickManagerActor extends AbstractActor {
                 .match(EntityActorMessages.EntityCreated.class, this::handleEntityCreated)
                 .match(EntityActorMessages.EntityRemoved.class, this::handleEntityRemoved)
                 .match(EntityActorMessages.TickSingleEntity.class, this::handleAsyncSingleTick)
-                .match(EntityActorMessages.MainThreadCallback.class, msg -> {
-                    // Execute the callback on the Minecraft server thread
-                    ZefirOptimizations.SERVER.execute(() -> msg.callback().accept("Some result"));
-                })
+//                .match(EntityActorMessages.MainThreadCallback.class, msg -> {
+//                    // Execute the callback on the Minecraft server thread
+//                    ZefirOptimizations.SERVER.execute(() -> msg.callback().accept("Some result"));
+//                })
                 .build();
     }
 
@@ -58,12 +60,26 @@ public class AsyncTickManagerActor extends AbstractActor {
 
     private void handleEntityCreated(EntityActorMessages.EntityCreated msg) {
         LivingEntity entity = msg.entity();
-        ActorRef entitySupervisor = getContext().actorOf(EntityActorSupervisor.props(entity), "entitySupervisor_" + entity.getUuid());
+        if (pendingRemoval.contains(entity.getUuid())) { // Check pending removal
+            pendingRemoval.remove(entity.getUuid()); // Remove from pending
+            return; // Don't create the actor yet
+        }
+
+        String actorName = "entitySupervisor_" + entity.getUuid();
+
+        if (getContext().findChild(actorName).isPresent()) {
+            LOGGER.warn("Actor with name {} already exists. This could indicate a problem with entity lifecycle management.", actorName);
+            LOGGER.warn("Entity details: {}", entity);
+        }
+
+        ActorRef entitySupervisor = getContext().findChild(actorName).orElseGet(() -> getContext().actorOf(EntityActorSupervisor.props(entity), actorName));
         entityActors.put(entity, entitySupervisor); // Store the supervisor reference
     }
 
     private void handleEntityRemoved(EntityActorMessages.EntityRemoved msg) {
         LivingEntity entity = msg.entity();
+//        ZefirOptimizations.LOGGER.info("EntityRemoved: {}", entity.getUuid());
+        pendingRemoval.add(entity.getUuid()); // Add to pending removal
         ActorRef entityActor = entityActors.get(entity);
         if (entityActor != null) {
             entityActor.tell(PoisonPill.getInstance(), getSelf()); // Send poison pill for self-termination

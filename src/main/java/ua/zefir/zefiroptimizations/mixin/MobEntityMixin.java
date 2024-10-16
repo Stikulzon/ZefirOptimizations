@@ -45,6 +45,7 @@ public abstract class MobEntityMixin extends LivingEntityMixin implements IAsync
         LivingEntity self = (LivingEntity) (Object) this;
         zefiroptimizations$setAsyncTicking(true);
         if (!world.isClient) {
+//            ZefirOptimizations.LOGGER.info("getUuid: {}", self.getUuid());
             ZefirOptimizations.getAsyncTickManager()
                     .tell(new EntityActorMessages.EntityCreated(self), ActorRef.noSender());
         }

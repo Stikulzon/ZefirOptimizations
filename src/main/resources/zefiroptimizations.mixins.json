@@ -4,19 +4,17 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "ArmorStandEntityMixin",
-    "BlockCollisionSpliteratorMixin",
     "CheckedRandomMixin",
-    "CollisionViewMixin",
     "EntityIndexMixin",
     "EntityListMixin",
     "EntityMixin",
-    "EntityMixin1",
     "EntityTrackingSectionMixin",
     "EntityViewMixin",
     "LivingEntityMixin",
     "MobEntityMixin",
     "PalettedContainerMixin",
-    "WorkStationCompetitionTaskMixin"
+    "SectionedEntityCacheMixin",
+    "ServerChunkLoadingManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
