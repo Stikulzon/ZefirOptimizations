@@ -8,7 +8,6 @@ import net.minecraft.util.function.LazyIterationConsumer;
 import net.minecraft.world.entity.EntityIndex;
 import net.minecraft.world.entity.EntityLike;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -21,9 +20,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Mixin(EntityIndex.class)
 public class EntityIndexMixin<T extends EntityLike> {
-    @Final
-    @Shadow
-    private static Logger LOGGER;
     @Shadow
     @Final
     @Mutable

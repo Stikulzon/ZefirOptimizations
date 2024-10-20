@@ -64,10 +64,10 @@ public class AsyncTickManagerActor extends AbstractActor {
 
         String actorName = "entitySupervisor_" + entity.getUuid();
 
-        if (getContext().findChild(actorName).isPresent()) {
-            LOGGER.warn("Actor with name {} already exists. This could indicate a problem with entity lifecycle management.", actorName);
-            LOGGER.warn("Entity details: {}", entity);
-        }
+//        if (getContext().findChild(actorName).isPresent()) {
+//            LOGGER.warn("Actor with name {} already exists. This could indicate a problem with entity lifecycle management.", actorName);
+//            LOGGER.warn("Entity details: {}", entity);
+//        }
 
         ActorRef entitySupervisor = getContext().findChild(actorName).orElseGet(() -> getContext().actorOf(EntityActorSupervisor.props(entity), actorName));
         entityActors.put(entity, entitySupervisor);
