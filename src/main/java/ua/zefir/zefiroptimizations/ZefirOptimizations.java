@@ -25,7 +25,7 @@ public class ZefirOptimizations implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		actorSystem = ActorSystem.create("MinecraftActorSystem");
+		actorSystem = ActorSystem.create("ZefirOptimizationsActorSystem");
 		asyncTickManager = actorSystem.actorOf(AsyncTickManagerActor.props(), "asyncTickManager");
 		mainThreadActor = actorSystem.actorOf(Props.create(MainThreadActor.class), "mainThreadActor");
 
