@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.actors.IArmorStandEntityAccess;
-import ua.zefir.zefiroptimizations.actors.EntityActorMessages;
+import ua.zefir.zefiroptimizations.actors.ZefirsActorMessages;
 
 import java.util.function.Predicate;
 
@@ -36,7 +36,7 @@ public abstract class ArmorStandEntityMixin extends LivingEntityMixin implements
         zefiroptimizations$setAsyncTicking(true);
         if (!world.isClient) {
             ZefirOptimizations.getAsyncTickManager()
-                    .tell(new EntityActorMessages.EntityCreated(self), ActorRef.noSender());
+                    .tell(new ZefirsActorMessages.EntityCreated(self), ActorRef.noSender());
         }
     }
 }

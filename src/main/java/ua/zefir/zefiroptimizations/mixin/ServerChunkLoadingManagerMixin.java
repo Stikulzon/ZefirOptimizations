@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
-import ua.zefir.zefiroptimizations.actors.EntityActorMessages;
+import ua.zefir.zefiroptimizations.actors.ZefirsActorMessages;
 
 @Mixin(ServerChunkLoadingManager.class)
 public class ServerChunkLoadingManagerMixin {
@@ -18,7 +18,7 @@ public class ServerChunkLoadingManagerMixin {
     private void onEntityUnload(Entity entity, CallbackInfo ci){
         if(entity instanceof LivingEntity livingEntity) {
             ZefirOptimizations.getAsyncTickManager()
-                    .tell(new EntityActorMessages.EntityRemoved(livingEntity), ActorRef.noSender());
+                    .tell(new ZefirsActorMessages.EntityRemoved(livingEntity), ActorRef.noSender());
         }
     }
 }

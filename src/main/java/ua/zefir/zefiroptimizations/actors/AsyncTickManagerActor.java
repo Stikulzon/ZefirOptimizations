@@ -11,8 +11,6 @@ import ua.zefir.zefiroptimizations.ZefirOptimizations;
 
 import java.util.*;
 
-import static ua.zefir.zefiroptimizations.ZefirOptimizations.LOGGER;
-
 public class AsyncTickManagerActor extends AbstractActor {
     private final Map<LivingEntity, ActorRef> entityActors = new HashMap<>();
 //    private final Set<UUID> pendingRemoval = new HashSet<>();
@@ -24,14 +22,14 @@ public class AsyncTickManagerActor extends AbstractActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(EntityActorMessages.AsyncTick.class, this::handleAsyncTick)
-                .match(EntityActorMessages.EntityCreated.class, this::handleEntityCreated)
-                .match(EntityActorMessages.EntityRemoved.class, this::handleEntityRemoved)
-                .match(EntityActorMessages.TickSingleEntity.class, this::handleAsyncSingleTick)
+                .match(ZefirsActorMessages.AsyncTick.class, this::handleAsyncTick)
+                .match(ZefirsActorMessages.EntityCreated.class, this::handleEntityCreated)
+                .match(ZefirsActorMessages.EntityRemoved.class, this::handleEntityRemoved)
+                .match(ZefirsActorMessages.TickSingleEntity.class, this::handleAsyncSingleTick)
                 .build();
     }
 
-    private void handleAsyncTick(EntityActorMessages.AsyncTick msg) {
+    private void handleAsyncTick(ZefirsActorMessages.AsyncTick msg) {
         ServerWorld world = ZefirOptimizations.SERVER.getOverworld();
 
         // TODO: there are better way to handle it
@@ -47,15 +45,15 @@ public class AsyncTickManagerActor extends AbstractActor {
         }
     }
 
-    private void handleAsyncSingleTick(EntityActorMessages.TickSingleEntity msg) {
+    private void handleAsyncSingleTick(ZefirsActorMessages.TickSingleEntity msg) {
             ActorRef entityActor = entityActors.get(msg.entity());
 
             if (entityActor != null) {
-                entityActor.tell(new EntityActorMessages.AsyncTick(), getSelf());
+                entityActor.tell(new ZefirsActorMessages.AsyncTick(), getSelf());
             }
     }
 
-    private void handleEntityCreated(EntityActorMessages.EntityCreated msg) {
+    private void handleEntityCreated(ZefirsActorMessages.EntityCreated msg) {
         LivingEntity entity = msg.entity();
 //        if (pendingRemoval.contains(entity.getUuid())) {
 //            pendingRemoval.remove(entity.getUuid());
@@ -73,7 +71,7 @@ public class AsyncTickManagerActor extends AbstractActor {
         entityActors.put(entity, entitySupervisor);
     }
 
-    private void handleEntityRemoved(EntityActorMessages.EntityRemoved msg) {
+    private void handleEntityRemoved(ZefirsActorMessages.EntityRemoved msg) {
         LivingEntity entity = msg.entity();
 //        ZefirOptimizations.LOGGER.info("EntityRemoved: {}", entity.getUuid());
 //        pendingRemoval.add(entity.getUuid());

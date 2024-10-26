@@ -6,6 +6,7 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.GameRules;
+import ua.zefir.zefiroptimizations.ZefirOptimizations;
 
 public class MobEntityActor extends EntityActor {
     public MobEntityActor(MobEntity entity) {
@@ -19,13 +20,13 @@ public class MobEntityActor extends EntityActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(EntityActorMessages.AsyncTick.class, this::handleAsyncTick)
-                .match(EntityActorMessages.ContinueTickMovement.class, this::continueTickMovement)
+                .match(ZefirsActorMessages.AsyncTick.class, this::handleAsyncTick)
+                .match(ZefirsActorMessages.ContinueTickMovement.class, this::continueTickMovement)
                 .build();
     }
 
     @Override
-    protected void handleAsyncTick(EntityActorMessages.AsyncTick msg) {
+    protected void handleAsyncTick(ZefirsActorMessages.AsyncTick msg) {
         if (!entity.isRemoved()) {
             this.tickMobEntityMovement();
         }
@@ -33,10 +34,9 @@ public class MobEntityActor extends EntityActor {
 
     @Override
     public void tickMobEntityMovement() {
-//        long millis = System.currentTimeMillis();
         super.tickMobEntityMovement();
 
-        if(this.entity instanceof MobEntity mobEntity) {
+        if (this.entity instanceof MobEntity mobEntity) {
             mobEntity.getWorld().getProfiler().push("looting");
             if (!mobEntity.getWorld().isClient && mobEntity.canPickUpLoot() && mobEntity.isAlive() && !mobEntity.isDead() && mobEntity.getWorld().getGameRules().getBoolean(GameRules.DO_MOB_GRIEFING)
             ) {
@@ -45,7 +45,11 @@ public class MobEntityActor extends EntityActor {
                 for (ItemEntity itemEntity : mobEntity.getWorld()
                         .getNonSpectatingEntities(ItemEntity.class, mobEntity.getBoundingBox().expand(vec3i.getX(), vec3i.getY(), vec3i.getZ()))) {
                     if (!itemEntity.isRemoved() && !itemEntity.getStack().isEmpty() && !itemEntity.cannotPickup() && mobEntity.canGather(itemEntity.getStack())) {
-                        entityAccess.zefiroptimizations$loot(itemEntity);
+                        ZefirOptimizations.getMainThreadActor().tell(
+                                new ZefirsActorMessages.
+                                        LootItemEntity(entityAccess, itemEntity),
+                                getSelf()
+                        );
                     }
                 }
             }
@@ -57,9 +61,5 @@ public class MobEntityActor extends EntityActor {
                 ((IAsyncLivingEntityAccess) mobEntity).zefiroptimizations$updateGoalControls();
             }
         }
-//        long tickTake = System.currentTimeMillis() - millis;
-//        if(tickTake>20) {
-//            System.out.println("tick take: " + tickTake);
-//        }
     }
 }

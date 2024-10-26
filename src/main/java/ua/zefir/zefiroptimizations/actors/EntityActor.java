@@ -22,6 +22,7 @@ import net.minecraft.item.ElytraItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.predicate.entity.EntityPredicates;
+import net.minecraft.registry.Registries;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.registry.tag.TagKey;
@@ -61,13 +62,12 @@ public class EntityActor extends AbstractActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(EntityActorMessages.AsyncTick.class, this::handleAsyncTick)
-                .match(EntityActorMessages.ContinueTickMovement.class, this::continueTickMovement) // Handle the continuation message
-//                .match(EntityActorMessages.ContinueTickMovement.class, this::handleContinueTickMovement)
+                .match(ZefirsActorMessages.AsyncTick.class, this::handleAsyncTick)
+                .match(ZefirsActorMessages.ContinueTickMovement.class, this::continueTickMovement)
                 .build();
     }
 
-    protected void handleAsyncTick(EntityActorMessages.AsyncTick msg) {
+    protected void handleAsyncTick(ZefirsActorMessages.AsyncTick msg) {
             if (!entity.isRemoved()) {
                 this.tickMobEntityMovement();
             }
@@ -126,17 +126,17 @@ public class EntityActor extends AbstractActor {
 //            entityAccess.zefiroptimizations$tickNewAi();
 //            entity.getWorld().getProfiler().pop();
             ZefirOptimizations.getMainThreadActor().tell(
-                    new EntityActorMessages.TickNewAiAndContinue(getSelf(), entity),
+                    new ZefirsActorMessages.TickNewAiAndContinue(getSelf(), entity),
                     getSelf()
             );
 //            ZefirOptimizations.LOGGER.info("Test");
             return;
         }
 //        continueTickMovement();
-        this.getSelf().tell(new EntityActorMessages.ContinueTickMovement(), getSelf());
+        this.getSelf().tell(new ZefirsActorMessages.ContinueTickMovement(), getSelf());
     }
 
-    protected void continueTickMovement(EntityActorMessages.ContinueTickMovement msg) {
+    protected void continueTickMovement(ZefirsActorMessages.ContinueTickMovement msg) {
         if (entity.isRemoved()) {
             return;
         }
@@ -202,7 +202,11 @@ public class EntityActor extends AbstractActor {
         entityAccess.zefiroptimizations$removePowderSnowSlow();
         entityAccess.zefiroptimizations$addPowderSnowSlowIfNeeded();
         if (!entity.getWorld().isClient && entity.age % 40 == 0 && entity.isFrozen() && entity.canFreeze()) {
-            entity.damage(entity.getDamageSources().freeze(), 1.0F);
+//            entity.damage(entity.getDamageSources().freeze(), 1.0F);
+            ZefirOptimizations.getMainThreadActor().tell(
+                    new ZefirsActorMessages.ApplyDamage(entity, entity.getDamageSources().freeze(), 1.0F),
+                    getSelf()
+            );
         }
 
         entity.getWorld().getProfiler().pop();
@@ -216,7 +220,11 @@ public class EntityActor extends AbstractActor {
         this.tickCramming();
         entity.getWorld().getProfiler().pop();
         if (!entity.getWorld().isClient && entity.hurtByWater() && entity.isWet()) {
-            entity.damage(entity.getDamageSources().drown(), 1.0F);
+//            entity.damage(entity.getDamageSources().drown(), 1.0F);
+            ZefirOptimizations.getMainThreadActor().tell(
+                    new ZefirsActorMessages.ApplyDamage(entity, entity.getDamageSources().drown(), 1.0F),
+                    getSelf()
+            );
         }
     }
 
@@ -243,7 +251,11 @@ public class EntityActor extends AbstractActor {
                     }
 
                     if (nonVehicleEntities > maxEntityCramming - 1) {
-                        entity.damage(entity.getDamageSources().cramming(), 6.0F);
+//                        entity.damage(entity.getDamageSources().cramming(), 6.0F);
+                        ZefirOptimizations.getMainThreadActor().tell(
+                                new ZefirsActorMessages.ApplyDamage(entity, entity.getDamageSources().cramming(), 6.0F),
+                                getSelf()
+                        );
                     }
                 }
 
@@ -445,7 +457,12 @@ public class EntityActor extends AbstractActor {
                     float o = (float)(n * 10.0 - 3.0);
                     if (o > 0.0F) {
                         entity.playSound(entityAccess.zefiroptimizations$getFallSound((int)o), 1.0F, 1.0F);
-                        entity.damage(entity.getDamageSources().flyIntoWall(), o);
+//                        entity.damage(entity.getDamageSources().flyIntoWall(), o);
+                        ZefirOptimizations.getMainThreadActor().tell(
+                                new ZefirsActorMessages.
+                                        ApplyDamage(entity, entity.getDamageSources().flyIntoWall(), o),
+                                getSelf()
+                        );
                     }
                 }
 

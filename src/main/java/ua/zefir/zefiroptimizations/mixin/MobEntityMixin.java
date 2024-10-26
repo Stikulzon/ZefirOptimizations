@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
-import ua.zefir.zefiroptimizations.actors.EntityActorMessages;
+import ua.zefir.zefiroptimizations.actors.ZefirsActorMessages;
 import ua.zefir.zefiroptimizations.actors.IAsyncLivingEntityAccess;
 import ua.zefir.zefiroptimizations.actors.IAsyncTickingLivingEntity;
 
@@ -47,7 +47,7 @@ public abstract class MobEntityMixin extends LivingEntityMixin implements IAsync
         if (!world.isClient) {
 //            ZefirOptimizations.LOGGER.info("getUuid: {}", self.getUuid());
             ZefirOptimizations.getAsyncTickManager()
-                    .tell(new EntityActorMessages.EntityCreated(self), ActorRef.noSender());
+                    .tell(new ZefirsActorMessages.EntityCreated(self), ActorRef.noSender());
         }
     }
 
@@ -59,7 +59,7 @@ public abstract class MobEntityMixin extends LivingEntityMixin implements IAsync
     @Inject(method = "tickMovement", at = @At("HEAD"), cancellable = true)
     private void onTickMovement(CallbackInfo ci) {
         MobEntity self = (MobEntity) (Object) this;
-        ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
+        ZefirOptimizations.getAsyncTickManager().tell(new ZefirsActorMessages.TickSingleEntity(self), ActorRef.noSender());
         ci.cancel();
     }
 }

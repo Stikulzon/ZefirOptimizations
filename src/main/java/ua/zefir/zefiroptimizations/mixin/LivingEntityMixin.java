@@ -507,7 +507,7 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
         LivingEntity self = (LivingEntity) (Object) this;
         if (!self.getWorld().isClient) {
             ZefirOptimizations.getAsyncTickManager()
-                    .tell(new EntityActorMessages.EntityRemoved(self), ActorRef.noSender());
+                    .tell(new ZefirsActorMessages.EntityRemoved(self), ActorRef.noSender());
         }
     }
 
@@ -515,7 +515,7 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
     private void onTickMovement(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
         if (self instanceof ArmorStandEntity) {
-            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
+            ZefirOptimizations.getAsyncTickManager().tell(new ZefirsActorMessages.TickSingleEntity(self), ActorRef.noSender());
             ci.cancel();
 //        } else if (self instanceof MobEntity) {
 //            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
