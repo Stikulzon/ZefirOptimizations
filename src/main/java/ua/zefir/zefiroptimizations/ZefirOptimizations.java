@@ -22,6 +22,7 @@ public class ZefirOptimizations implements ModInitializer {
 	private static ActorRef asyncTickManager;
 	@Getter
 	private static ActorRef mainThreadActor;
+	public static boolean firstTimeIterating = true;
 
 	@Override
 	public void onInitialize() {

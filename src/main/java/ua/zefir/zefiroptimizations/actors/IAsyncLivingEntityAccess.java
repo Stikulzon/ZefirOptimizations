@@ -139,6 +139,8 @@ public interface IAsyncLivingEntityAccess {
 
     void zefiroptimizations$setRiptideStack(ItemStack stack);
 
+    ItemStack zefiroptimizations$getRiptideStack();
+
     void zefiroptimizations$addAirTravelEffects();
 
     void zefiroptimizations$playSwimSound();

@@ -242,6 +242,11 @@ public abstract class LivingEntityMixin extends EntityMixin implements IAsyncTic
     }
 
     @Override
+    public ItemStack zefiroptimizations$getRiptideStack() {
+        return riptideStack;
+    }
+
+    @Override
     public void zefiroptimizations$setJumpingCooldown(int jumpingCooldown) {
         this.jumpingCooldown = jumpingCooldown;
     }
