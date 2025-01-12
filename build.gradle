@@ -44,7 +44,7 @@ dependencies {
 //	include (implementation 'org.eclipse.collections:eclipse-collections:11.1.0')
 
 	include (implementation 'com.typesafe.akka:akka-actor_3:2.9.4')
-	include (implementation 'com.typesafe.akka:akka-actor-typed_3:2.9.4')
+//	include (implementation 'com.typesafe.akka:akka-actor-typed_3:2.9.4')
 	include (implementation 'com.typesafe:config:1.4.3')
 	include (implementation 'org.scala-lang:scala3-library_3:3.3.3')
 	include (implementation "org.scala-lang.modules:scala-java8-compat_2.13:1.0.2")

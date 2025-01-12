@@ -24,6 +24,10 @@ public abstract class ArmorStandEntityMixin extends LivingEntityMixin implements
     @Shadow
     private static Predicate<Entity> RIDEABLE_MINECART_PREDICATE;
 
+    public ArmorStandEntityMixin(EntityType<?> type, World world) {
+        super(type, world);
+    }
+
     @Override
     public Predicate<Entity> zefiroptimizations$RIDEABLE_MINECART_PREDICATE() {
         return RIDEABLE_MINECART_PREDICATE;
@@ -33,7 +37,7 @@ public abstract class ArmorStandEntityMixin extends LivingEntityMixin implements
     private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
         System.out.println("ArmorStand spawned");
         LivingEntity self = (LivingEntity) (Object) this;
-        zefiroptimizations$setAsyncTicking(true);
+//        zefiroptimizations$setAsyncTicking(true);
         if (!world.isClient) {
             ZefirOptimizations.getAsyncTickManager()
                     .tell(new ZefirsActorMessages.EntityCreated(self), ActorRef.noSender());

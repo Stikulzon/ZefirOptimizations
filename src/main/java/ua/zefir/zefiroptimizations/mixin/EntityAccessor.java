@@ -11,6 +11,7 @@ import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
 import net.minecraft.util.math.ChunkPos;
 import  net.minecraft.fluid.Fluid;
@@ -21,6 +22,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,8 +49,6 @@ public interface EntityAccessor {
     @Accessor("vehicle")
     Entity getVehicle();
 
-//    @Accessor("world")
-//    World getWorld();
 
     @Accessor("prevX")
     double getPrevX();
@@ -58,36 +58,11 @@ public interface EntityAccessor {
 
     @Accessor("prevZ")
     double getPrevZ();
-
-//    @Accessor("pos")
-//    Vec3d getPos();
-
-//    @Accessor("blockPos")
-//    BlockPos getBlockPos();
-//
-//    @Accessor("chunkPos")
-//    ChunkPos getChunkPos();
-//
-//    @Accessor("velocity")
-//    Vec3d getVelocity();
-//
-//    @Accessor("yaw")
-//    float getYaw();
-//
-//    @Accessor("pitch")
-//    float getPitch();
-//
     @Accessor("prevYaw")
     float getPrevYaw();
 
     @Accessor("prevPitch")
     float getPrevPitch();
-//
-//    @Accessor("boundingBox")
-//    Box getBoundingBox();
-//
-//    @Accessor("onGround")
-//    boolean isOnGround();
 
     @Accessor("horizontalCollision")
     boolean isHorizontalCollision();
@@ -299,6 +274,10 @@ public interface EntityAccessor {
     @Accessor("dataTracker")
     DataTracker getDataTracker();
 
+
+    @Invoker("getBoundingBox")
+    Box invokeGetBoundingBox();
+
     @Accessor("stateAtPos")
     void setStateAtPos(BlockState stateAtPos);
 
@@ -417,6 +396,11 @@ public interface EntityAccessor {
 
     @Invoker("lerpPosAndRotation")
     void invokeLerpPosAndRotation(int step, double x, double y, double z, double yaw, double pitch);
+
+    @Invoker("findCollisionsForMovement")
+    static List<VoxelShape> invokeFindCollisionsForMovement(@Nullable Entity entity, World world, List<VoxelShape> regularCollisions, Box movingEntityBoundingBox) {
+        throw new AssertionError();
+    };
 
     @Invoker("canClimb")
     boolean invokeCanClimb(BlockState state);

@@ -2,6 +2,7 @@ package ua.zefir.zefiroptimizations.mixin;
 
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.brain.Brain;
 import net.minecraft.entity.damage.DamageSource;
@@ -11,6 +12,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
@@ -412,15 +414,22 @@ public interface LivingEntityAccessor extends EntityAccessor  {
     @Accessor("prevScale")
     void setPrevScale(float prevScale);
 
-    @Accessor("USING_RIPTIDE_FLAG")
-    int getUSING_RIPTIDE_FLAG();
+    @Accessor("jumping")
+    boolean isJumping();
 
+    @Accessor("USING_RIPTIDE_FLAG")
+    static int getUSING_RIPTIDE_FLAG() {
+        throw new AssertionError();
+    }
 
     @Invoker("isImmobile")
     boolean invokeIsImmobile();
 
     @Invoker("removePowderSnowSlow")
     void invokeRemovePowderSnowSlow();
+
+    @Invoker("tickCramming")
+    void invokeTickCramming();
 
     @Invoker("addPowderSnowSlowIfNeeded")
     void invokeAddPowderSnowSlowIfNeeded();
@@ -439,6 +448,9 @@ public interface LivingEntityAccessor extends EntityAccessor  {
 
     @Invoker("tickFallFlying")
     void invokeTickFallFlying();
+
+    @Invoker("tickNewAi")
+    void invokeTickNewAi();
 
     @Invoker("swimUpward")
     void invokeSwimUpward(TagKey<Fluid> fluid);

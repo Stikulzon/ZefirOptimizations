@@ -12,11 +12,6 @@ public class ArmorStandEntityActor extends EntityActor {
     }
 
     @Override
-    public void tickMobEntityMovement() {
-        super.tickMobEntityMovement();
-    }
-
-    @Override
     protected void tickCramming() {
         for (Entity entity : getEntity().getWorld().getOtherEntities(getEntity(), getEntity().getBoundingBox(), entityAccess.zefiroptimizations$RIDEABLE_MINECART_PREDICATE())) {
             if (getEntity().squaredDistanceTo(entity) <= 0.2) {

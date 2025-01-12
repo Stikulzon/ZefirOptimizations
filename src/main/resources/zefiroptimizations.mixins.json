@@ -9,14 +9,13 @@
     "EntityIndexMixin",
     "EntityListMixin",
     "EntityMixin",
-    "EntityTrackingSectionMixin",
     "EntityViewMixin",
     "ItemEntityMixin",
     "LivingEntityAccessor",
     "LivingEntityMixin",
+    "MobEntityAccessor",
     "MobEntityMixin",
-    "SectionedEntityCacheMixin",
-    "ServerChunkLoadingManagerMixin",
+    "ServerWorldMixin",
     "SpawnHelperMixin"
   ],
   "injectors": {

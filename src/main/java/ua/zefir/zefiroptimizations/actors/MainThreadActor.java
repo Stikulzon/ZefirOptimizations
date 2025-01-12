@@ -5,19 +5,20 @@ import akka.actor.AbstractActor;
 import net.minecraft.entity.LivingEntity;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.mixin.LivingEntityAccessor;
+import ua.zefir.zefiroptimizations.mixin.MobEntityAccessor;
 
 public class MainThreadActor extends AbstractActor {
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(ZefirsActorMessages.TickNewAiAndContinue.class, msg -> {
-                    ZefirOptimizations.SERVER.execute(() -> {
-                        msg.entity().getWorld().getProfiler().push("newAi");
-                        ((IAsyncLivingEntityAccess) msg.entity()).zefiroptimizations$tickNewAi();
-                        msg.entity().getWorld().getProfiler().pop();
-                        msg.requestingActor().tell(new ZefirsActorMessages.ContinueTickMovement(), getSelf());
-                    });
-                })
+//                .match(ZefirsActorMessages.TickNewAiAndContinue.class, msg -> {
+//                    ZefirOptimizations.SERVER.execute(() -> {
+//                        msg.entity().getWorld().getProfiler().push("newAi");
+//                        ((LivingEntityAccessor) msg.entity()).invokeTickNewAi();
+//                        msg.entity().getWorld().getProfiler().pop();
+////                        msg.requestingActor().tell(new ZefirsActorMessages.ContinueTickMovement(), getSelf());
+//                    });
+//                })
                 .match(ZefirsActorMessages.ApplyDamage.class, msg -> {
                     ZefirOptimizations.SERVER.execute(() -> {
                         msg.entity().damage(msg.source(), msg.amount());
@@ -25,88 +26,93 @@ public class MainThreadActor extends AbstractActor {
                 })
                 .match(ZefirsActorMessages.LootItemEntity.class, msg -> {
                     ZefirOptimizations.SERVER.execute(() -> {
-                        msg.iAsyncLivingEntityAccess().zefiroptimizations$loot(msg.itemEntity());
+                        ((MobEntityAccessor) msg.entity()).invokeLoot(msg.itemEntity());
                     });
                 })
-                .match(ZefirsActorMessages.ApplyPositionAndRotationDiff.class, this::applyPositionAndRotationDiff)
+                .match(ZefirsActorMessages.FindCollisionsForMovement.class, msg -> {
+                    ZefirOptimizations.SERVER.execute(() -> {
+                        getSender().tell(42, getSelf());
+                    });
+                })
+//                .match(ZefirsActorMessages.ApplyPositionAndRotationDiff.class, this::applyPositionAndRotationDiff)
                 .build();
     }
 
-    private void applyPositionAndRotationDiff(ZefirsActorMessages.ApplyPositionAndRotationDiff msg) {
-        ZefirOptimizations.SERVER.execute(() -> {
-            LivingEntity entity = msg.entity();
-            EntityActor.EntitySnapshot snapshot = msg.snapshot();
-
-            if(ZefirOptimizations.firstTimeIterating) {
-                System.out.println("Entity Pos before setting: " + entity.getPos());
-                System.out.println("Snapshot Pos before setting: " + snapshot.getPos());
-            }
-
-            LivingEntityAccessor entityToSetAccess = (LivingEntityAccessor) entity;
-            LivingEntityAccessor entityToGetAccess = (LivingEntityAccessor) snapshot;
-
-            double diffX = snapshot.getX() - entity.getX();
-            double diffY = snapshot.getY() - entity.getY();
-            double diffZ = snapshot.getZ() - entity.getZ();
-
-//            entity.setPos(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ);
-
-            entity.refreshPositionAndAngles(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ, snapshot.getYaw(), snapshot.getPitch());
-            entity.setPos(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ);
-
+//    private void applyPositionAndRotationDiff(ZefirsActorMessages.ApplyPositionAndRotationDiff msg) {
+//        ZefirOptimizations.SERVER.execute(() -> {
+//            LivingEntity entity = msg.entity();
+//            EntityActor.EntitySnapshot snapshot = msg.snapshot();
+//
 //            if(ZefirOptimizations.firstTimeIterating) {
-//                System.out.println("diffX: " + (entity.getX() + diffX));
-//                System.out.println("diffY: " + (entity.getY() + diffY));
-//                System.out.println("diffZ: " + (entity.getZ() + diffZ));
-//                System.out.println("Entity Pos setting 1: " + entity.getPos());
-//                entity.setPos(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ);
-//                System.out.println("Entity Pos setting 2: " + entity.getPos());
-//                Vec3d pos = new Vec3d(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ);
-//                entityToSetAccess.setPos(pos);
-//                System.out.println("Entity Pos setting 3: " + entity.getPos());
+//                System.out.println("Entity Pos before setting: " + entity.getPos());
+//                System.out.println("Snapshot Pos before setting: " + snapshot.getPos());
 //            }
-
-//            double diffServerX = entityToGetAccess.getServerX() - entityToSetAccess.getServerX();
-//            double diffServerY = entityToGetAccess.getServerY() - entityToSetAccess.getServerY();
-//            double diffServerZ = entityToGetAccess.getServerZ() - entityToSetAccess.getServerZ();
 //
-//            entityToSetAccess.setServerX(entityToSetAccess.getServerX() + diffServerX);
-//            entityToSetAccess.setServerY(entityToSetAccess.getServerY() + diffServerY);
-//            entityToSetAccess.setServerZ(entityToSetAccess.getServerZ() + diffServerZ);
-
-//            entityToSetAccess.setServerYaw(entityToGetAccess.getServerYaw());
-//            entityToSetAccess.setServerPitch(entityToGetAccess.getServerPitch());
-//            entityToSetAccess.setServerHeadYaw(entityToGetAccess.getServerHeadYaw());
-
-//            entityToSetAccess.setPrevX(entityToGetAccess.getPrevX());
-//            entityToSetAccess.setPrevY(entityToGetAccess.getPrevY());
-//            entityToSetAccess.setPrevZ(entityToGetAccess.getPrevZ());
-
-
-//            int diffBlockPosX = entityToSetAccess.getBlockPos().getX() + (entityToGetAccess.getBlockPos().getX() - entityToSetAccess.getBlockPos().getX());
-//            int diffBlockPosY = entityToSetAccess.getBlockPos().getY() + ((entityToGetAccess.getBlockPos().getY() - entityToSetAccess.getBlockPos().getY()));
-//            int diffBlockPosZ = entityToSetAccess.getBlockPos().getZ() + ((entityToGetAccess.getBlockPos().getZ() - entityToSetAccess.getBlockPos().getZ()));
+//            LivingEntityAccessor entityToSetAccess = (LivingEntityAccessor) entity;
+//            LivingEntityAccessor entityToGetAccess = (LivingEntityAccessor) snapshot;
 //
-//            BlockPos diffBlockPos = new BlockPos(diffBlockPosX, diffBlockPosY, diffBlockPosZ);
+//            double diffX = snapshot.getX() - entity.getX();
+//            double diffY = snapshot.getY() - entity.getY();
+//            double diffZ = snapshot.getZ() - entity.getZ();
 //
-//            entityToSetAccess.setBlockPos(diffBlockPos);
+////            entity.setPos(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ);
 //
-//            int diffChunkPosX = entityToSetAccess.getChunkPos().x + (entityToGetAccess.getChunkPos().x - entityToSetAccess.getChunkPos().x);
-//            int diffChunkPosZ = entityToSetAccess.getChunkPos().z + (entityToGetAccess.getChunkPos().z - entityToSetAccess.getChunkPos().z);
+//            entity.refreshPositionAndAngles(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ, snapshot.getYaw(), snapshot.getPitch());
+//            entity.setPos(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ);
 //
-//            ChunkPos diffChunkPos = new ChunkPos(diffChunkPosX, diffChunkPosZ);
+////            if(ZefirOptimizations.firstTimeIterating) {
+////                System.out.println("diffX: " + (entity.getX() + diffX));
+////                System.out.println("diffY: " + (entity.getY() + diffY));
+////                System.out.println("diffZ: " + (entity.getZ() + diffZ));
+////                System.out.println("Entity Pos setting 1: " + entity.getPos());
+////                entity.setPos(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ);
+////                System.out.println("Entity Pos setting 2: " + entity.getPos());
+////                Vec3d pos = new Vec3d(entity.getX() + diffX, entity.getY() + diffY, entity.getZ() + diffZ);
+////                entityToSetAccess.setPos(pos);
+////                System.out.println("Entity Pos setting 3: " + entity.getPos());
+////            }
 //
-//            entityToSetAccess.setChunkPos(diffChunkPos);
-
-
-//            setEntityValues(msg.entity(), msg.snapshot());
-
-            if(ZefirOptimizations.firstTimeIterating) {
-                System.out.println("Entity Pos after setting: " + entity.getPos());
-            }
-            ZefirOptimizations.firstTimeIterating = false;
-        });
-    }
+////            double diffServerX = entityToGetAccess.getServerX() - entityToSetAccess.getServerX();
+////            double diffServerY = entityToGetAccess.getServerY() - entityToSetAccess.getServerY();
+////            double diffServerZ = entityToGetAccess.getServerZ() - entityToSetAccess.getServerZ();
+////
+////            entityToSetAccess.setServerX(entityToSetAccess.getServerX() + diffServerX);
+////            entityToSetAccess.setServerY(entityToSetAccess.getServerY() + diffServerY);
+////            entityToSetAccess.setServerZ(entityToSetAccess.getServerZ() + diffServerZ);
+//
+////            entityToSetAccess.setServerYaw(entityToGetAccess.getServerYaw());
+////            entityToSetAccess.setServerPitch(entityToGetAccess.getServerPitch());
+////            entityToSetAccess.setServerHeadYaw(entityToGetAccess.getServerHeadYaw());
+//
+////            entityToSetAccess.setPrevX(entityToGetAccess.getPrevX());
+////            entityToSetAccess.setPrevY(entityToGetAccess.getPrevY());
+////            entityToSetAccess.setPrevZ(entityToGetAccess.getPrevZ());
+//
+//
+////            int diffBlockPosX = entityToSetAccess.getBlockPos().getX() + (entityToGetAccess.getBlockPos().getX() - entityToSetAccess.getBlockPos().getX());
+////            int diffBlockPosY = entityToSetAccess.getBlockPos().getY() + ((entityToGetAccess.getBlockPos().getY() - entityToSetAccess.getBlockPos().getY()));
+////            int diffBlockPosZ = entityToSetAccess.getBlockPos().getZ() + ((entityToGetAccess.getBlockPos().getZ() - entityToSetAccess.getBlockPos().getZ()));
+////
+////            BlockPos diffBlockPos = new BlockPos(diffBlockPosX, diffBlockPosY, diffBlockPosZ);
+////
+////            entityToSetAccess.setBlockPos(diffBlockPos);
+////
+////            int diffChunkPosX = entityToSetAccess.getChunkPos().x + (entityToGetAccess.getChunkPos().x - entityToSetAccess.getChunkPos().x);
+////            int diffChunkPosZ = entityToSetAccess.getChunkPos().z + (entityToGetAccess.getChunkPos().z - entityToSetAccess.getChunkPos().z);
+////
+////            ChunkPos diffChunkPos = new ChunkPos(diffChunkPosX, diffChunkPosZ);
+////
+////            entityToSetAccess.setChunkPos(diffChunkPos);
+//
+//
+////            setEntityValues(msg.entity(), msg.snapshot());
+//
+//            if(ZefirOptimizations.firstTimeIterating) {
+//                System.out.println("Entity Pos after setting: " + entity.getPos());
+//            }
+//            ZefirOptimizations.firstTimeIterating = false;
+//        });
+//    }
 
 
     public void setEntityValues(LivingEntity entityToSet, LivingEntity entityToGet, LivingEntity snapshot){
