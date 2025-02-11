@@ -78,13 +78,19 @@ public abstract class EntityMixin {
 //        }
 //        System.out.println("Adjusting movement on the main thread");
 //    }
-//
-    @Inject(method = "adjustMovementForCollisions(Lnet/minecraft/util/math/Vec3d;)Lnet/minecraft/util/math/Vec3d;", at = @At("HEAD"), cancellable = true)
-    private void onAdjustMovementForCollisions1(Vec3d movement, CallbackInfoReturnable<Vec3d> cir) {
-        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
-            ZefirOptimizations.SERVER.execute(() -> {
-                cir.setReturnValue( ( (EntityAccessor) this).invokeAdjustMovementForCollisions(movement) );
-            });
-        }
-    }
+
+//    @Debug(export = true)
+//    @Inject(method = "adjustMovementForCollisions(Lnet/minecraft/util/math/Vec3d;)Lnet/minecraft/util/math/Vec3d;", at = @At("HEAD"), cancellable = true)
+//    private void onAdjustMovementForCollisions1(Vec3d movement, CallbackInfoReturnable<Vec3d> cir) {
+//        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
+//            cir.cancel();
+//            System.out.println("Adjust movement on the akka thread");
+//            ZefirOptimizations.SERVER.executeSync(() -> {
+//                Vec3d vec3d = ( (EntityAccessor) this).invokeAdjustMovementForCollisions(movement);
+//                cir.setReturnValue(vec3d);
+//            });
+//            return;
+//        }
+//        System.out.println("Adjust movement on the main thread " + Thread.currentThread() + " " + ZefirOptimizations.SERVER.getThread() + (Thread.currentThread() != ZefirOptimizations.SERVER.getThread()));
+//    }
 }

@@ -7,6 +7,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.ServerWorldAccess;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -19,7 +20,7 @@ import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 
 @Mixin(ServerWorld.class)
-public class ServerWorldMixin {
+public class ServerWorldMixin  {
 //    private Timeout timeout = Timeout.create(Duration.ofSeconds(10));
 //
 //    @Redirect(method = "method_31420", at = @At(
