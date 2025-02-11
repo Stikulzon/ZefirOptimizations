@@ -29,6 +29,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.actors.*;
 
+import java.util.concurrent.CompletableFuture;
+
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin extends Entity implements IAsyncTickingLivingEntity {
     public LivingEntityMixin(EntityType<?> type, World world) {
@@ -55,6 +57,29 @@ public abstract class LivingEntityMixin extends Entity implements IAsyncTickingL
 ////            ci.cancel();
 //        }
 //    }
+
+    @Redirect(method = "tickMovement",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/entity/LivingEntity;tickNewAi()V"
+            )
+    )
+    private void redirectTickNewAi(LivingEntity self) {
+        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
+//            ZefirOptimizations.LOGGER.info("Ticking new AI");
+            CompletableFuture<Void> future = new CompletableFuture<>();
+
+            ZefirOptimizations.SERVER.execute(() -> {
+                ((LivingEntityAccessor) this).invokeTickNewAi();
+                future.complete(null);
+            });
+
+            try {
+                future.get();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     private void onTick(CallbackInfo ci) {
@@ -101,22 +126,32 @@ public abstract class LivingEntityMixin extends Entity implements IAsyncTickingL
         }
     }
 
-    @Inject(method = "tickNewAi", at = @At("HEAD"), cancellable = true)
-    private void onTickNewAi(CallbackInfo ci) {
+//    @Inject(method = "tickNewAi", at = @At("HEAD"), cancellable = true)
+//    private void onTickNewAi(CallbackInfo ci) {
 //        ZefirOptimizations.LOGGER.info("Ticking new AI!");
-        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
-            ZefirOptimizations.LOGGER.info("Ticking new AI");
-//            ZefirOptimizations.getMainThreadActor().tell(
-//                    new ZefirsActorMessages.TickNewAiAndContinue(ActorRef.noSender(), (LivingEntity) (Object) this),
-//                    ActorRef.noSender()
-//            );
-            // This is bad
-            ZefirOptimizations.SERVER.execute(() -> {
-                        ((LivingEntityAccessor) this).invokeTickNewAi();
-            });
-            ci.cancel();
-        }
-    }
+//        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
+//            ZefirOptimizations.LOGGER.info("Ticking new AI");
+////            ZefirOptimizations.getMainThreadActor().tell(
+////                    new ZefirsActorMessages.TickNewAiAndContinue(ActorRef.noSender(), (LivingEntity) (Object) this),
+////                    ActorRef.noSender()
+////            );
+//            // This is bad
+//            CompletableFuture<Void> future = new CompletableFuture<>();
+//
+//            ZefirOptimizations.SERVER.execute(() -> {
+//                ((LivingEntityAccessor) this).invokeTickNewAi();
+//                future.complete(null);
+//            });
+//
+//            try {
+//                future.get();
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//
+//            ci.cancel();
+//        }
+//    }
 //
 //    @Redirect(method = "tickMovement", at = @At(
 //            value = "INVOKE",

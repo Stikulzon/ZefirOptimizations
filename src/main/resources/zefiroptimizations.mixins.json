@@ -17,7 +17,6 @@
     "MobEntityAccessor",
     "MobEntityMixin",
     "RegistryWorldViewMixin",
-    "SectionedEntityCacheMixin",
     "ServerWorldMixin",
     "SpawnHelperMixin"
   ],
