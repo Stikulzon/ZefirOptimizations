@@ -65,7 +65,6 @@ public abstract class LivingEntityMixin extends Entity implements IAsyncTickingL
     )
     private void redirectTickNewAi(LivingEntity self) {
         if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
-//            ZefirOptimizations.LOGGER.info("Ticking new AI");
             CompletableFuture<Void> future = new CompletableFuture<>();
 
             ZefirOptimizations.SERVER.execute(() -> {
@@ -76,7 +75,7 @@ public abstract class LivingEntityMixin extends Entity implements IAsyncTickingL
             try {
                 future.get();
             } catch (Exception e) {
-                e.printStackTrace();
+                throw new RuntimeException(e);
             }
         }
     }

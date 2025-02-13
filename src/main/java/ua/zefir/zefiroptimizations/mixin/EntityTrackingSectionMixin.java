@@ -2,7 +2,6 @@ package ua.zefir.zefiroptimizations.mixin;
 
 import net.minecraft.util.TypeFilter;
 import net.minecraft.util.annotation.Debug;
-import net.minecraft.util.collection.TypeFilterableList;
 import net.minecraft.util.function.LazyIterationConsumer;
 import net.minecraft.util.math.Box;
 import net.minecraft.world.entity.EntityLike;
@@ -12,31 +11,27 @@ import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import ua.zefir.zefiroptimizations.data.ConcurrentTypeFilterableList;
 
 import java.util.Collection;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
 @Mixin(EntityTrackingSection.class)
 public abstract class EntityTrackingSectionMixin<T extends EntityLike> {
-//    @Unique
-//    private CopyOnWriteArrayList<T> collection;
-//    @Unique
-//    private volatile EntityTrackingStatus status;
+    @Unique
+    private ConcurrentTypeFilterableList<T> collection;
 
-//    @Inject(method = "<init>", at = @At("TAIL"))
-//    private void onInit(Class entityClass, EntityTrackingStatus initialStatus, CallbackInfo ci) {
-//        this.status = initialStatus;
-//        this.collection = new CopyOnWriteArrayList<>();
-//    }
+    @Inject(method = "<init>", at = @At("TAIL"))
+    private void onInit(Class entityClass, EntityTrackingStatus initialStatus, CallbackInfo ci) {
+        this.status = initialStatus;
+        this.collection = new ConcurrentTypeFilterableList<>(entityClass);
+    }
 
-    @Shadow @Final private TypeFilterableList<T> collection;
+//    @Shadow @Final private TypeFilterableList<T> collection;
     @Shadow private EntityTrackingStatus status;
 
-    @Unique
-    private final ReentrantLock lock = new ReentrantLock();
+//    @Unique
+//    private final ReentrantLock lock = new ReentrantLock();
 
     /**
      * @author Zefir
@@ -44,12 +39,7 @@ public abstract class EntityTrackingSectionMixin<T extends EntityLike> {
      */
     @Overwrite
     public void add(T entity) {
-        lock.lock();
-        try {
-            this.collection.add(entity);
-        } finally {
-            lock.unlock();
-        }
+        this.collection.add(entity);
     }
 
     /**
@@ -58,12 +48,7 @@ public abstract class EntityTrackingSectionMixin<T extends EntityLike> {
      */
     @Overwrite
     public boolean remove(T entity) {
-        lock.lock();
-        try {
-            return this.collection.remove(entity);
-        } finally {
-            lock.unlock();
-        }
+        return this.collection.remove(entity);
     }
 
     /**
@@ -72,15 +57,10 @@ public abstract class EntityTrackingSectionMixin<T extends EntityLike> {
      */
     @Overwrite
     public LazyIterationConsumer.NextIteration forEach(Box box, LazyIterationConsumer<T> consumer) {
-        lock.lock();
-        try {
         for (T entityLike : this.collection) {
             if (entityLike.getBoundingBox().intersects(box) && consumer.accept(entityLike).shouldAbort()) {
                 return LazyIterationConsumer.NextIteration.ABORT;
             }
-        }
-        } finally {
-            lock.unlock();
         }
 
         return LazyIterationConsumer.NextIteration.CONTINUE;
@@ -92,24 +72,18 @@ public abstract class EntityTrackingSectionMixin<T extends EntityLike> {
      */
     @Overwrite
     public <U extends T> LazyIterationConsumer.NextIteration forEach(TypeFilter<T, U> type, Box box, LazyIterationConsumer<? super U> consumer) {
-        lock.lock();
-        try {
-            Collection<? extends T> collection = this.collection.getAllOfType(type.getBaseClass());
-            if (collection.isEmpty()) {
-                return LazyIterationConsumer.NextIteration.CONTINUE;
-            } else {
-                for (T entityLike : collection) {
-                    U entityLike2 = (U) type.downcast(entityLike);
-                    if (entityLike2 != null && entityLike.getBoundingBox().intersects(box) && consumer.accept(entityLike2).shouldAbort()) {
-                        return LazyIterationConsumer.NextIteration.ABORT;
-                    }
+        Collection<? extends T> collection = this.collection.getAllOfType(type.getBaseClass());
+        if (collection.isEmpty()) {
+            return LazyIterationConsumer.NextIteration.CONTINUE;
+        } else {
+            for (T entityLike : collection) {
+                U entityLike2 = (U)type.downcast(entityLike);
+                if (entityLike2 != null && entityLike.getBoundingBox().intersects(box) && consumer.accept(entityLike2).shouldAbort()) {
+                    return LazyIterationConsumer.NextIteration.ABORT;
                 }
-
-                return LazyIterationConsumer.NextIteration.CONTINUE;
             }
 
-        } finally {
-            lock.unlock();
+            return LazyIterationConsumer.NextIteration.CONTINUE;
         }
     }
 

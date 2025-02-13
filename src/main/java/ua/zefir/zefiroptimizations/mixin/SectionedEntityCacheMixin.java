@@ -5,7 +5,6 @@ import it.unimi.dsi.fastutil.longs.*;
 import java.util.Objects;
 import java.util.PrimitiveIterator;
 import java.util.Spliterators;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -23,7 +22,6 @@ import net.minecraft.world.entity.EntityTrackingStatus;
 import net.minecraft.world.entity.SectionedEntityCache;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.*;
-import ua.zefir.zefiroptimizations.data.ConcurrentLongSortedSet;
 
 @Mixin(value = SectionedEntityCache.class)
 public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
