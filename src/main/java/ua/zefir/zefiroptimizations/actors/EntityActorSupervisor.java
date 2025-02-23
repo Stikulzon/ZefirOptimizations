@@ -1,68 +1,38 @@
 package ua.zefir.zefiroptimizations.actors;
 
-
-import akka.actor.AbstractActor;
-import akka.actor.ActorRef;
-import akka.actor.OneForOneStrategy;
-import akka.actor.Props;
-import akka.actor.SupervisorStrategy;
-import akka.japi.pf.DeciderBuilder;
+import akka.actor.typed.ActorRef;
+import akka.actor.typed.Behavior;
+import akka.actor.typed.SupervisorStrategy;
+import akka.actor.typed.javadsl.AbstractBehavior;
+import akka.actor.typed.javadsl.ActorContext;
+import akka.actor.typed.javadsl.Behaviors;
+import akka.actor.typed.javadsl.Receive;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.decoration.ArmorStandEntity;
-import net.minecraft.entity.mob.MobEntity;
-import scala.concurrent.duration.Duration;
 
-import java.util.concurrent.TimeUnit;
+public class EntityActorSupervisor extends AbstractBehavior<ZefirsActorMessages.EntityMessage> {
 
-import static akka.actor.SupervisorStrategy.escalate;
-import static akka.actor.SupervisorStrategy.restart;
-import static akka.actor.SupervisorStrategy.resume;
-import static ua.zefir.zefiroptimizations.ZefirOptimizations.LOGGER;
+    private final ActorRef<ZefirsActorMessages.EntityMessage> entityActor;
 
-public class EntityActorSupervisor extends AbstractActor {
-
-    private final ActorRef entityActor;
-
-    public static Props props(LivingEntity entity) {
-            return Props.create(EntityActorSupervisor.class, entity);
+    public static Behavior<ZefirsActorMessages.EntityMessage> create(LivingEntity entity) {
+        return Behaviors.setup(context ->
+                new EntityActorSupervisor(context, entity)
+        );
     }
-
-    public EntityActorSupervisor(LivingEntity entity) {
+    private EntityActorSupervisor(ActorContext<ZefirsActorMessages.EntityMessage> context, LivingEntity entity) {
+        super(context);
         String actorName = "entityActor_" + entity.getUuid();
+        entityActor = context.spawn(Behaviors.supervise(EntityActor.create(entity)).onFailure(SupervisorStrategy.restart()), actorName);
+        context.watch(entityActor);
 
-//        if (getContext().findChild(actorName).isPresent()) {
-//            LOGGER.warn("Actor with name {} already exists. This could indicate a problem with entity lifecycle management.", actorName);
-//            LOGGER.warn("Entity details: {}", entity);
-//        }
-
-        entityActor = getContext().findChild(actorName).orElseGet(() -> {
-            if (entity instanceof MobEntity) {
-                return getContext().actorOf(MobEntityActor.props(entity), actorName);
-            } else if (entity instanceof ArmorStandEntity) {
-                return getContext().actorOf(ArmorStandEntityActor.props(entity), actorName);
-            } else {
-                return getContext().actorOf(EntityActor.props(entity), actorName);
-            }
-        });
     }
 
     @Override
-    public Receive createReceive() {
-        return receiveBuilder()
-                .matchAny(message -> entityActor.forward(message, getContext()))
+    public Receive<ZefirsActorMessages.EntityMessage> createReceive() {
+        return newReceiveBuilder()
+                .onAnyMessage(message -> {
+                    entityActor.tell(message);
+                    return this;
+                })
                 .build();
-    }
-
-    private static final SupervisorStrategy strategy =
-            new OneForOneStrategy(10, Duration.create(1, TimeUnit.MINUTES), DeciderBuilder
-                    .match(NullPointerException.class, e -> restart())
-                    .match(IllegalArgumentException.class, e -> resume())
-                    .match(RuntimeException.class, e -> restart())
-                    .matchAny(o -> escalate())
-                    .build());
-
-    @Override
-    public SupervisorStrategy supervisorStrategy() {
-        return strategy;
     }
 }

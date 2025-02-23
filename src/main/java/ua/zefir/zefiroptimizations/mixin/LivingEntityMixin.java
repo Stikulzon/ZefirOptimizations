@@ -41,22 +41,10 @@ public abstract class LivingEntityMixin extends Entity implements IAsyncTickingL
     private void onRemove(Entity.RemovalReason reason, CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
         if (!self.getWorld().isClient && !(self instanceof PlayerEntity)) {
-            ZefirOptimizations.getAsyncTickManager()
-                    .tell(new ZefirsActorMessages.EntityRemoved(self), ActorRef.noSender());
+            ZefirOptimizations.getActorSystem()
+                    .tell(new ZefirsActorMessages.EntityRemoved(self));
         }
     }
-//
-//    @Inject(method = "tickMovement", at = @At("HEAD"), cancellable = true)
-//    private void onTickMovement(CallbackInfo ci) {
-//        LivingEntity self = (LivingEntity) (Object) this;
-//        if (self instanceof ArmorStandEntity) {
-//            ZefirOptimizations.getAsyncTickManager().tell(new ZefirsActorMessages.TickSingleEntity(self), ActorRef.noSender());
-//            ci.cancel();
-////        } else if (self instanceof MobEntity) {
-////            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
-////            ci.cancel();
-//        }
-//    }
 
     @Redirect(method = "tickMovement",
             at = @At(value = "INVOKE",
@@ -85,86 +73,22 @@ public abstract class LivingEntityMixin extends Entity implements IAsyncTickingL
         LivingEntity self = (LivingEntity) (Object) this;
         if(!(self instanceof PlayerEntity)) {
             if (Thread.currentThread() == ZefirOptimizations.SERVER.getThread()) {
-                ZefirOptimizations.getAsyncTickManager().tell(new ZefirsActorMessages.TickSingleEntity(self), ActorRef.noSender());
-                ci.cancel();
-            } else if (Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
-
-            } else {
-                System.out.println("Weired behaviour in ticking loop, thread: " + Thread.currentThread() + ", is it server thread: " + (Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) + ", main thread: " + ZefirOptimizations.SERVER.getThread());
+                ZefirOptimizations.getActorSystem().tell(new ZefirsActorMessages.TickSingleEntity(self));
                 ci.cancel();
             }
-//            System.out.println("Ticking");
         }
-//        } else if (self instanceof MobEntity) {
-//            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
-//            ci.cancel();
     }
-
-//    @Inject(method = "baseTick", at = @At("HEAD"), cancellable = true)
-//    private void onBaseTick(CallbackInfo ci) {
-//        LivingEntity self = (LivingEntity) (Object) this;
-////        System.out.println("BaseTicking");
-//        if(Thread.currentThread() == ZefirOptimizations.SERVER.getThread() && !(self instanceof PlayerEntity)) {
-//            ZefirOptimizations.getAsyncTickManager().tell(new ZefirsActorMessages.BaseTickSingleEntity(self), ActorRef.noSender());
-//            ci.cancel();
-//        }
-////        } else if (self instanceof MobEntity) {
-////            ZefirOptimizations.getAsyncTickManager().tell(new EntityActorMessages.TickSingleEntity(self), ActorRef.noSender());
-////            ci.cancel();
-//    }
 
     @Inject(method = "damage", at = @At("HEAD"), cancellable = true) // Fucked up
     private void onDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         LivingEntity self = (LivingEntity) (Object) this;
         if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread() && !(self instanceof PlayerEntity)) {
             ZefirOptimizations.getMainThreadActor().tell(
-                    new ZefirsActorMessages.ApplyDamage(self, source, amount),
-                    ActorRef.noSender()
+                    new ZefirsActorMessages.ApplyDamage(self, source, amount)
             );
             cir.cancel();
         }
     }
-
-//    @Inject(method = "tickNewAi", at = @At("HEAD"), cancellable = true)
-//    private void onTickNewAi(CallbackInfo ci) {
-//        ZefirOptimizations.LOGGER.info("Ticking new AI!");
-//        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
-//            ZefirOptimizations.LOGGER.info("Ticking new AI");
-////            ZefirOptimizations.getMainThreadActor().tell(
-////                    new ZefirsActorMessages.TickNewAiAndContinue(ActorRef.noSender(), (LivingEntity) (Object) this),
-////                    ActorRef.noSender()
-////            );
-//            // This is bad
-//            CompletableFuture<Void> future = new CompletableFuture<>();
-//
-//            ZefirOptimizations.SERVER.execute(() -> {
-//                ((LivingEntityAccessor) this).invokeTickNewAi();
-//                future.complete(null);
-//            });
-//
-//            try {
-//                future.get();
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-//
-//            ci.cancel();
-//        }
-//    }
-//
-//    @Redirect(method = "tickMovement", at = @At(
-//            value = "INVOKE",
-//            target = "Lnet/minecraft/entity/LivingEntity;tickNewAi()V"
-//    ))
-//    private void onTickMovement(LivingEntity instance) {
-//        LivingEntity self = (LivingEntity) (Object) this;
-//        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread() && !(self instanceof PlayerEntity)) {
-//            // This is bad
-//            ZefirOptimizations.SERVER.execute(() -> {
-//                        ((LivingEntityAccessor) this).invokeTickNewAi();
-//            });
-//        }
-//    }
 
     @Inject(method = "tickCramming", at = @At("HEAD"), cancellable = true)
     private void onTravel(CallbackInfo ci) { // TODO: Remove this

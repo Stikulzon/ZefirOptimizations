@@ -26,8 +26,8 @@ public abstract class MobEntityMixin extends LivingEntityMixin {
     private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
         if (!world.isClient) {
-            ZefirOptimizations.getAsyncTickManager()
-                    .tell(new ZefirsActorMessages.EntityCreated(self), ActorRef.noSender());
+            ZefirOptimizations.getActorSystem()
+                    .tell(new ZefirsActorMessages.EntityCreated(self));
         }
     }
 
@@ -43,8 +43,7 @@ public abstract class MobEntityMixin extends LivingEntityMixin {
     private void onLoot(ItemEntity item, CallbackInfo ci) {
         if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
             ZefirOptimizations.getMainThreadActor().tell(
-                    new ZefirsActorMessages.LootItemEntity((LivingEntity) (Object) this, item),
-                    ActorRef.noSender()
+                    new ZefirsActorMessages.LootItemEntity((LivingEntity) (Object) this, item)
             );
             ci.cancel();
         }

@@ -10,16 +10,15 @@
     "EntityIndexMixin",
     "EntityListMixin",
     "EntityMixin",
-    "EntityTrackingSectionMixin",
     "EntityViewMixin",
     "ItemEntityMixin",
     "LivingEntityAccessor",
     "LivingEntityMixin",
     "MobEntityAccessor",
     "MobEntityMixin",
-    "RegistryWorldViewMixin",
     "ServerWorldMixin",
-    "SpawnHelperMixin"
+    "SpawnHelperMixin",
+    "WorldMixin"
   ],
   "injectors": {
     "defaultRequire": 1

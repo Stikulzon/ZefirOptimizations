@@ -1,6 +1,5 @@
 package ua.zefir.zefiroptimizations.mixin;
 
-import akka.actor.ActorRef;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
@@ -35,12 +34,10 @@ public abstract class ArmorStandEntityMixin extends LivingEntityMixin implements
 
     @Inject(method = "<init>(Lnet/minecraft/entity/EntityType;Lnet/minecraft/world/World;)V", at = @At("RETURN"))
     private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
-        System.out.println("ArmorStand spawned");
         LivingEntity self = (LivingEntity) (Object) this;
-//        zefiroptimizations$setAsyncTicking(true);
         if (!world.isClient) {
-            ZefirOptimizations.getAsyncTickManager()
-                    .tell(new ZefirsActorMessages.EntityCreated(self), ActorRef.noSender());
+            ZefirOptimizations.getActorSystem()
+                    .tell(new ZefirsActorMessages.EntityCreated(self));
         }
     }
 }

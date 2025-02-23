@@ -1,8 +1,8 @@
 package ua.zefir.zefiroptimizations;
 
-import akka.actor.ActorRef;
-import akka.actor.ActorSystem;
-import akka.actor.Props;
+import akka.actor.typed.ActorRef;
+import akka.actor.typed.ActorSystem;
+import akka.actor.typed.javadsl.Behaviors;
 import lombok.Getter;
 import net.fabricmc.api.ModInitializer;
 
@@ -12,26 +12,32 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ua.zefir.zefiroptimizations.actors.AsyncTickManagerActor;
 import ua.zefir.zefiroptimizations.actors.MainThreadActor;
+import ua.zefir.zefiroptimizations.actors.ZefirsActorMessages;
 
 public class ZefirOptimizations implements ModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger("zefiroptimizations");
 	public static MinecraftServer SERVER;
 	@Getter
-	private static ActorSystem actorSystem;
+	private static ActorSystem<ZefirsActorMessages.AsyncTickManagerMessage> actorSystem;
 	@Getter
-	private static ActorRef asyncTickManager;
-	@Getter
-	private static ActorRef mainThreadActor;
-	public static boolean firstTimeIterating = true;
+	private static ActorRef<ZefirsActorMessages.MainThreadMessage> mainThreadActor;
 
 	@Override
 	public void onInitialize() {
-		actorSystem = ActorSystem.create("ZefirOptimizationsActorSystem");
-		asyncTickManager = actorSystem.actorOf(AsyncTickManagerActor.props(), "asyncTickManager");
-		mainThreadActor = actorSystem.actorOf(Props.create(MainThreadActor.class), "mainThreadActor");
+		actorSystem = ActorSystem.create(AsyncTickManagerActor.create(), "ZefirOptimizationsActorSystem");
+		actorSystem = ActorSystem.create(Behaviors.setup(context -> {
+			mainThreadActor = context.spawn(MainThreadActor.create(), "mainThreadActor");
+			return AsyncTickManagerActor.create();
+		}), "ZefirOptimizationsActorSystem");
 
 		ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
 		ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
+	}
+
+	public static void shutdown() {
+		if (actorSystem != null) {
+			actorSystem.terminate();
+		}
 	}
 
 	private void onServerStarting(MinecraftServer server) {

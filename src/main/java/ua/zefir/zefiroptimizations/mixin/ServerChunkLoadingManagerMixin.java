@@ -17,8 +17,8 @@ public class ServerChunkLoadingManagerMixin {
     @Inject(method = "unloadEntity", at = @At("HEAD"))
     private void onEntityUnload(Entity entity, CallbackInfo ci){
         if(entity instanceof LivingEntity livingEntity) {
-            ZefirOptimizations.getAsyncTickManager()
-                    .tell(new ZefirsActorMessages.EntityRemoved(livingEntity), ActorRef.noSender());
+            ZefirOptimizations.getActorSystem()
+                    .tell(new ZefirsActorMessages.EntityRemoved(livingEntity));
         }
     }
 }

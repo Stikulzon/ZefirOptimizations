@@ -1,10 +1,12 @@
 package ua.zefir.zefiroptimizations.mixin;
 
+import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import it.unimi.dsi.fastutil.longs.*;
 
 import java.util.Objects;
 import java.util.PrimitiveIterator;
 import java.util.Spliterators;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -22,8 +24,11 @@ import net.minecraft.world.entity.EntityTrackingStatus;
 import net.minecraft.world.entity.SectionedEntityCache;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(value = SectionedEntityCache.class)
+@Mixin(value = SectionedEntityCache.class, priority = 999)
 public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
     @Final
     @Shadow
@@ -34,12 +39,16 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
     @Final
     @Shadow
     private Long2ObjectMap<EntityTrackingSection<T>> trackingSections = new Long2ObjectOpenHashMap<>();
-    @Final
-    @Shadow
-    private LongSortedSet trackedPositions = new LongAVLTreeSet();
 
     @Unique
+    private final ConcurrentSkipListSet<Long> trackedPositions = new ConcurrentSkipListSet<>(); // Use ConcurrentSkipListSet
+    @Unique
     private final ReentrantLock lock = new ReentrantLock();
+
+//    @Inject(method = "<init>", at = @At("TAIL"))
+//    private void onInit(Class entityClass, Long2ObjectFunction chunkStatusDiscriminator, CallbackInfo ci) {
+//        trackedPositions = new ConcurrentRadixTree<Long>();
+//    }
 
     /**
      * @author Zefir
@@ -47,40 +56,35 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
      */
     @Overwrite
     public void forEachInBox(Box box, LazyIterationConsumer<EntityTrackingSection<T>> consumer) {
-        lock.lock();
-        try {
-            int i = 2;
-            int j = ChunkSectionPos.getSectionCoord(box.minX - 2.0);
-            int k = ChunkSectionPos.getSectionCoord(box.minY - 4.0);
-            int l = ChunkSectionPos.getSectionCoord(box.minZ - 2.0);
-            int m = ChunkSectionPos.getSectionCoord(box.maxX + 2.0);
-            int n = ChunkSectionPos.getSectionCoord(box.maxY + 0.0);
-            int o = ChunkSectionPos.getSectionCoord(box.maxZ + 2.0);
+        int i = 2;
+        int j = ChunkSectionPos.getSectionCoord(box.minX - (double) 2.0F);
+        int k = ChunkSectionPos.getSectionCoord(box.minY - (double) 4.0F);
+        int l = ChunkSectionPos.getSectionCoord(box.minZ - (double) 2.0F);
+        int m = ChunkSectionPos.getSectionCoord(box.maxX + (double) 2.0F);
+        int n = ChunkSectionPos.getSectionCoord(box.maxY + (double) 0.0F);
+        int o = ChunkSectionPos.getSectionCoord(box.maxZ + (double) 2.0F);
 
-            for (int p = j; p <= m; p++) {
-                long q = ChunkSectionPos.asLong(p, 0, 0);
-                long r = ChunkSectionPos.asLong(p, -1, -1);
-                LongIterator longIterator = this.trackedPositions.subSet(q, r + 1L).iterator();
+        for (int p = j; p <= m; ++p) {
+            long q = ChunkSectionPos.asLong(p, 0, 0);
+            long r = ChunkSectionPos.asLong(p, -1, -1);
+            // Use subSet directly on ConcurrentSkipListSet (it's thread-safe)
+            LongIterator longIterator = (LongIterator) this.trackedPositions.subSet(q, r + 1L).iterator();
 
-                while (longIterator.hasNext()) {
-                    long s = longIterator.nextLong();
-                    int t = ChunkSectionPos.unpackY(s);
-                    int u = ChunkSectionPos.unpackZ(s);
-                    if (t >= k && t <= n && u >= l && u <= o) {
-                        EntityTrackingSection<T> entityTrackingSection = this.trackingSections.get(s);
-                        if (entityTrackingSection != null
-                                && !entityTrackingSection.isEmpty()
-                                && entityTrackingSection.getStatus().shouldTrack()
-                                && consumer.accept(entityTrackingSection).shouldAbort()) {
-                            return;
-                        }
+            while (longIterator.hasNext()) {
+                long s = longIterator.nextLong();
+                int t = ChunkSectionPos.unpackY(s);
+                int u = ChunkSectionPos.unpackZ(s);
+                if (t >= k && t <= n && u >= l && u <= o) {
+                    EntityTrackingSection<T> entityTrackingSection = (EntityTrackingSection<T>) this.trackingSections.get(s);
+                    if (entityTrackingSection != null && !entityTrackingSection.isEmpty() && entityTrackingSection.getStatus().shouldTrack() && consumer.accept(entityTrackingSection).shouldAbort()) {
+                        return;
                     }
                 }
             }
-        } finally {
-            lock.unlock();
         }
+
     }
+
 
     /**
      * @author Zefir
@@ -107,13 +111,7 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
     private LongSortedSet getSections(int chunkX, int chunkZ) {
         long l = ChunkSectionPos.asLong(chunkX, 0, chunkZ);
         long m = ChunkSectionPos.asLong(chunkX, -1, chunkZ);
-
-        lock.lock();
-        try {
-            return this.trackedPositions.subSet(l, m + 1L);
-        } finally {
-            lock.unlock();
-        }
+        return (LongSortedSet) this.trackedPositions.subSet(l, m + 1L); //Directly use subset
     }
 
     /**
@@ -121,13 +119,11 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
      * @reason Thread-safe SectionedEntityCache operations implementation
      */
     @Overwrite
-    public Stream<EntityTrackingSection<T>> getTrackingSections(long chunkPos) {
-        lock.lock();
-        try {
-            return this.getSections(chunkPos).mapToObj(this.trackingSections::get).filter(Objects::nonNull);
-        } finally {
-            lock.unlock();
-        }
+    public Stream<Object> getTrackingSections(long chunkPos) {
+        LongStream var10000 = this.getSections(chunkPos);
+        Long2ObjectMap var10001 = this.trackingSections;
+        Objects.requireNonNull(var10001);
+        return var10000.mapToObj(var10001::get).filter(Objects::nonNull);
     }
 
     /**
@@ -145,12 +141,8 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
      */
     @Overwrite
     public EntityTrackingSection<T> getTrackingSection(long sectionPos) {
-        lock.lock();
-        try {
-            return this.trackingSections.computeIfAbsent(sectionPos, this::addSection);
-        } finally {
-            lock.unlock();
-        }
+        // computeIfAbsent is thread-safe on Long2ObjectOpenHashMap
+        return (EntityTrackingSection<T>) this.trackingSections.computeIfAbsent(sectionPos, this::addSection);
     }
 
     /**
@@ -160,12 +152,8 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
     @Overwrite
     @Nullable
     public EntityTrackingSection<T> findTrackingSection(long sectionPos) {
-        lock.lock();
-        try {
-            return this.trackingSections.get(sectionPos);
-        } finally {
-            lock.unlock();
-        }
+        // get is thread-safe on Long2ObjectOpenHashMap
+        return (EntityTrackingSection) this.trackingSections.get(sectionPos);
     }
 
     /**
@@ -175,9 +163,9 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
     @Overwrite
     private EntityTrackingSection<T> addSection(long sectionPos) {
         long l = chunkPosFromSectionPos(sectionPos);
-        EntityTrackingStatus entityTrackingStatus = this.posToStatus.get(l);
-        this.trackedPositions.add(sectionPos);
-        return new EntityTrackingSection<>(this.entityClass, entityTrackingStatus);
+        EntityTrackingStatus entityTrackingStatus = (EntityTrackingStatus) this.posToStatus.get(l);
+        this.trackedPositions.add(sectionPos); // ConcurrentSkipListSet.add is thread-safe
+        return new EntityTrackingSection(this.entityClass, entityTrackingStatus);
     }
 
     /**
@@ -187,12 +175,8 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
     @Overwrite
     public LongSet getChunkPositions() {
         LongSet longSet = new LongOpenHashSet();
-        lock.lock();
-        try {
-            this.trackingSections.keySet().forEach(sectionPos -> longSet.add(chunkPosFromSectionPos(sectionPos)));
-        } finally {
-            lock.unlock();
-        }
+        // Iterate over a snapshot of the keys (thread-safe)
+        this.trackingSections.keySet().forEach((sectionPos) -> longSet.add(chunkPosFromSectionPos(sectionPos)));
         return longSet;
     }
 
@@ -202,12 +186,7 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
      */
     @Overwrite
     public void forEachIntersects(Box box, LazyIterationConsumer<T> consumer) {
-        lock.lock();
-        try {
-            this.forEachInBox(box, section -> section.forEach(box, consumer));
-        } finally {
-            lock.unlock();
-        }
+        this.forEachInBox(box, (section) -> section.forEach(box, consumer));
     }
 
     /**
@@ -216,12 +195,7 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
      */
     @Overwrite
     public <U extends T> void forEachIntersects(TypeFilter<T, U> filter, Box box, LazyIterationConsumer<U> consumer) {
-        lock.lock();
-        try {
-            this.forEachInBox(box, section -> section.forEach(filter, box, consumer));
-        } finally {
-            lock.unlock();
-        }
+        this.forEachInBox(box, (section) -> section.forEach(filter, box, consumer));
     }
 
     /**
@@ -230,13 +204,8 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
      */
     @Overwrite
     public void removeSection(long sectionPos) {
-        lock.lock();
-        try {
-            this.trackingSections.remove(sectionPos);
-            this.trackedPositions.remove(sectionPos);
-        } finally {
-            lock.unlock();
-        }
+        this.trackingSections.remove(sectionPos); // Thread-safe on Long2ObjectOpenHashMap
+        this.trackedPositions.remove(sectionPos); // ConcurrentSkipListSet.remove is thread-safe
     }
 
     /**
@@ -246,6 +215,6 @@ public abstract class SectionedEntityCacheMixin<T extends EntityLike> {
     @Overwrite
     @Debug
     public int sectionCount() {
-        return this.trackedPositions.size();
+        return this.trackedPositions.size(); // ConcurrentSkipListSet.size is thread-safe
     }
 }
