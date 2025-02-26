@@ -7,27 +7,30 @@ import lombok.Getter;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.minecraft.entity.Entity;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ua.zefir.zefiroptimizations.actors.AsyncTickManagerActor;
+import ua.zefir.zefiroptimizations.actors.ActorSystemManager;
 import ua.zefir.zefiroptimizations.actors.MainThreadActor;
-import ua.zefir.zefiroptimizations.actors.ZefirsActorMessages;
+import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
+import ua.zefir.zefiroptimizations.data.DummyEntityLookup;
 
 public class ZefirOptimizations implements ModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger("zefiroptimizations");
 	public static MinecraftServer SERVER;
 	@Getter
-	private static ActorSystem<ZefirsActorMessages.AsyncTickManagerMessage> actorSystem;
+	private static ActorSystem<ZefirsActorMessages.ActorSystemManagerMessage> actorSystem;
 	@Getter
 	private static ActorRef<ZefirsActorMessages.MainThreadMessage> mainThreadActor;
+	@Getter
+	private static final DummyEntityLookup<Entity> dummyEntityLookup = new DummyEntityLookup<>();
 
 	@Override
 	public void onInitialize() {
-		actorSystem = ActorSystem.create(AsyncTickManagerActor.create(), "ZefirOptimizationsActorSystem");
 		actorSystem = ActorSystem.create(Behaviors.setup(context -> {
 			mainThreadActor = context.spawn(MainThreadActor.create(), "mainThreadActor");
-			return AsyncTickManagerActor.create();
+			return ActorSystemManager.create();
 		}), "ZefirOptimizationsActorSystem");
 
 		ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);

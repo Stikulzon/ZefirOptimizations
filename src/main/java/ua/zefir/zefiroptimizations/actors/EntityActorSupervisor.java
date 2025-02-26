@@ -8,6 +8,7 @@ import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import net.minecraft.entity.LivingEntity;
+import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
 
 public class EntityActorSupervisor extends AbstractBehavior<ZefirsActorMessages.EntityMessage> {
 

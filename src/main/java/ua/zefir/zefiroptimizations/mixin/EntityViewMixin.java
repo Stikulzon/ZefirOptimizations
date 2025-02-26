@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+// TODO: useless
 @Mixin(EntityView.class)
 public interface EntityViewMixin {
     /**

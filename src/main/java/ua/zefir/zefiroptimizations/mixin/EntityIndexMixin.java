@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+// TODO: useless
 @Mixin(EntityIndex.class)
 public class EntityIndexMixin<T extends EntityLike> {
     @Shadow

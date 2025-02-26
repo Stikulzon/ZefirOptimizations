@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.Shadow;
 
 import java.util.function.Consumer;
 
+// TODO: useless
 @Mixin(value = EntityList.class)
 public class EntityListMixin {
     @Shadow

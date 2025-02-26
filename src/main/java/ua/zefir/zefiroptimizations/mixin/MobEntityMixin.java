@@ -1,20 +1,16 @@
 package ua.zefir.zefiroptimizations.mixin;
 
-import akka.actor.ActorRef;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
-import ua.zefir.zefiroptimizations.actors.ZefirsActorMessages;
-import ua.zefir.zefiroptimizations.actors.IAsyncTickingLivingEntity;
+import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
 
 @Mixin(MobEntity.class)
 public abstract class MobEntityMixin extends LivingEntityMixin {
@@ -46,6 +42,18 @@ public abstract class MobEntityMixin extends LivingEntityMixin {
                     new ZefirsActorMessages.LootItemEntity((LivingEntity) (Object) this, item)
             );
             ci.cancel();
+        }
+    }
+
+
+    @Inject(method = "tickNewAi", at = @At("HEAD"), cancellable = true)
+    private void onTickNewAi(CallbackInfo ci) {
+        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()){
+            System.out.println("Ticking new ai on thread: " + Thread.currentThread().getName());
+            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+            for (StackTraceElement element : stackTrace) {
+                System.out.println(element);
+            }
         }
     }
 }

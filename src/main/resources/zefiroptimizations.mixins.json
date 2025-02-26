@@ -16,6 +16,7 @@
     "LivingEntityMixin",
     "MobEntityAccessor",
     "MobEntityMixin",
+    "ServerEntityManagerMixin",
     "ServerWorldMixin",
     "SpawnHelperMixin",
     "WorldMixin"

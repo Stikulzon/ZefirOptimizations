@@ -1,38 +1,24 @@
 package ua.zefir.zefiroptimizations.mixin;
 
-import akka.actor.AbstractActor;
-import akka.actor.ActorRef;
-import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.MovementType;
 import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.decoration.ArmorStandEntity;
-import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
-import ua.zefir.zefiroptimizations.actors.*;
+import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
 
 import java.util.concurrent.CompletableFuture;
 
 @Mixin(LivingEntity.class)
-public abstract class LivingEntityMixin extends Entity implements IAsyncTickingLivingEntity {
+public abstract class LivingEntityMixin extends Entity {
     public LivingEntityMixin(EntityType<?> type, World world) {
         super(type, world);
     }
@@ -55,7 +41,7 @@ public abstract class LivingEntityMixin extends Entity implements IAsyncTickingL
         if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
             CompletableFuture<Void> future = new CompletableFuture<>();
 
-            ZefirOptimizations.SERVER.execute(() -> {
+            ZefirOptimizations.SERVER.executeSync(() -> {
                 ((LivingEntityAccessor) this).invokeTickNewAi();
                 future.complete(null);
             });
@@ -91,14 +77,24 @@ public abstract class LivingEntityMixin extends Entity implements IAsyncTickingL
     }
 
     @Inject(method = "tickCramming", at = @At("HEAD"), cancellable = true)
-    private void onTravel(CallbackInfo ci) { // TODO: Remove this
+    private void onTravel(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
         if(!(self instanceof PlayerEntity)) {
             if (Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
+                CompletableFuture<Void> future = new CompletableFuture<>();
+
                 // This is bad
-                ZefirOptimizations.SERVER.execute(() -> {
+                ZefirOptimizations.SERVER.executeSync(() -> {
                     ((LivingEntityAccessor) this).invokeTickCramming();
+                    future.complete(null);
                 });
+
+                try {
+                    future.get();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
                 ci.cancel();
             }
         }

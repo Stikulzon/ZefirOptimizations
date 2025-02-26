@@ -17,6 +17,9 @@
 	"entrypoints": {
 		"main": [
 			"ua.zefir.zefiroptimizations.ZefirOptimizations"
+		],
+		"mixinsquared": [
+			"ua.zefir.zefiroptimizations.mixin.integrations.MixinCanceller"
 		]
 	},
 	"mixins": [

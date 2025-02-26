@@ -6,6 +6,7 @@ import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import net.minecraft.entity.*;
+import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
 import ua.zefir.zefiroptimizations.mixin.LivingEntityAccessor;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -15,7 +16,6 @@ public class EntityActor extends AbstractBehavior<ZefirsActorMessages.EntityMess
     protected final LivingEntityAccessor newEntityAccess;
     protected final ThreadLocalRandom random = ThreadLocalRandom.current();
 
-    // Factory method (no more Props)
     public static Behavior<ZefirsActorMessages.EntityMessage> create(LivingEntity entity) {
         return Behaviors.setup(context -> new EntityActor(context, entity));
     }
@@ -23,19 +23,19 @@ public class EntityActor extends AbstractBehavior<ZefirsActorMessages.EntityMess
     private EntityActor(ActorContext<ZefirsActorMessages.EntityMessage> context, LivingEntity entity) {
         super(context);
         this.entity = entity;
-        this.newEntityAccess = (LivingEntityAccessor) entity;  // Assuming this is still valid
+        this.newEntityAccess = (LivingEntityAccessor) entity;
     }
 
     @Override
     public Receive<ZefirsActorMessages.EntityMessage> createReceive() {
         return newReceiveBuilder()
-                .onMessage(ZefirsActorMessages.AsyncTick.class, this::handleAsyncTick)
+                .onMessage(ZefirsActorMessages.Tick.class, this::handleAsyncTick)
                 .onMessage(ZefirsActorMessages.BaseTickSingleEntity.class, this::handleBaseTick)
                 .onMessage(ZefirsActorMessages.RequestIsRemoved.class, this::onRequestIsRemoved)
                 .build();
     }
 
-    private Behavior<ZefirsActorMessages.EntityMessage> handleAsyncTick(ZefirsActorMessages.AsyncTick msg) {
+    private Behavior<ZefirsActorMessages.EntityMessage> handleAsyncTick(ZefirsActorMessages.Tick msg) {
         if (!entity.isRemoved()) {
             entity.tick();
         }
