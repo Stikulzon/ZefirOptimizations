@@ -8,16 +8,21 @@ import net.minecraft.util.function.LazyIterationConsumer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.World;
 import net.minecraft.world.entity.EntityLike;
+import net.minecraft.world.entity.EntityTrackingSection;
 import net.minecraft.world.entity.EntityTrackingStatus;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.Writer;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-public class ServerEntityManagerMessages {
-    public sealed interface ServerEntityManagerMessage permits AddEntities, Close, Dump, EntityLookupForEach, EntityLookupForEachIntersects, EntityLookupForEachIntersectsTypeFilter, Flush, LoadEntities, RequestAddEntity, RequestDebugString, RequestEntityLookupById, RequestEntityLookupByUuid, RequestEntityLookupIterable, RequestHas, RequestIndexSize, RequestIsLoaded, RequestShouldTickBlockPos, RequestShouldTickChunkPos, Save, Tick, UpdateTrackingStatus, UpdateTrackingStatusChunkLevelType {}
+public final class ServerEntityManagerMessages {
+    public sealed interface ServerEntityManagerMessage permits AddEntities, RequestCacheTrackingSection, Close, Dump, EntityLeftSection, EntityLookupForEach, EntityLookupForEachIntersects, EntityLookupForEachIntersectsTypeFilter, EntityUuidsRemove, Flush, HandlerDestroy, HandlerUpdateLoadStatus, LoadEntities, RequestAddEntity, RequestDebugString, RequestEntitiesByTypeServerWorld, RequestEntitiesByTypeWorld, RequestEntityLookupById, RequestEntityLookupByUuid, RequestEntityLookupIterable, RequestHas, RequestIndexSize, RequestIsLoaded, RequestOtherEntities, RequestShouldTickBlockPos, RequestShouldTickChunkPos, Save, StartTicking, StartTracking, StopTicking, StopTracking, Tick, UpdateTrackingStatus, UpdateTrackingStatusChunkLevelType {}
     public sealed interface ServerEntityManagerMessageResponse permits ResponseDebugString, ResponseEntityLookupEntity, ResponseEntityLookupIterable, ResponseIndexSize {}
 
     public record Tick() implements ServerEntityManagerMessage {}
@@ -49,14 +54,33 @@ public class ServerEntityManagerMessages {
     public record ResponseDebugString(String debugString) implements ServerEntityManagerMessageResponse {}
     public record ResponseIndexSize(int indexSize) implements ServerEntityManagerMessageResponse {}
 
+    // Lookups
     public record RequestEntityLookupByUuid(UUID uuid, ActorRef<ResponseEntityLookupEntity> replyTo) implements ServerEntityManagerMessage {}
     public record RequestEntityLookupById(int id, ActorRef<ResponseEntityLookupEntity> replyTo) implements ServerEntityManagerMessage {}
     public record RequestEntityLookupIterable<T extends EntityLike>(ActorRef<ResponseEntityLookupIterable<T>> replyTo) implements ServerEntityManagerMessage {}
+    public record RequestOtherEntities(@Nullable Entity except, Box box, Predicate<? super Entity> predicate, ActorRef<List<Entity>> replyTo) implements ServerEntityManagerMessage {}
+    public record RequestEntitiesByTypeWorld<T extends Entity>(TypeFilter<Entity, T> filter, Box box, Predicate<? super T> predicate, int limit, World world, ActorRef<List<? extends T>> replyTo) implements ServerEntityManagerMessage {}
+    public record RequestEntitiesByTypeServerWorld<T extends Entity>(TypeFilter<Entity, T> filter, Predicate<? super T> predicate, int limit, ActorRef<List<? extends T>> replyTo) implements ServerEntityManagerMessage {}
+
+    public record ResponseEntityLookupEntity(Entity entity) implements ServerEntityManagerMessageResponse {}
+//    public record ResponseOtherEntities(List<Entity> list) implements ServerEntityManagerMessageResponse {}
+    public record ResponseEntityLookupIterable<T extends EntityLike>(Iterable<T> iterable) implements ServerEntityManagerMessageResponse {}
 
     public record EntityLookupForEachIntersects(Box box, Consumer action) implements ServerEntityManagerMessage {}
     public record EntityLookupForEachIntersectsTypeFilter(TypeFilter filter, Box box, LazyIterationConsumer consumer) implements ServerEntityManagerMessage {}
     public record EntityLookupForEach(TypeFilter filter, LazyIterationConsumer consumer) implements ServerEntityManagerMessage {}
 
-    public record ResponseEntityLookupEntity(Entity entity) implements ServerEntityManagerMessageResponse {}
-    public record ResponseEntityLookupIterable<T extends EntityLike>(Iterable<T> iterable) implements ServerEntityManagerMessageResponse {}
+    // Listener
+    public record EntityLeftSection<T extends EntityLike>(long sectionPos, EntityTrackingSection<T> section) implements ServerEntityManagerMessage {}
+    public record StartTicking<T extends EntityLike>(T entity) implements ServerEntityManagerMessage {}
+    public record StopTicking<T extends EntityLike>(T entity) implements ServerEntityManagerMessage {}
+    public record StartTracking<T extends EntityLike>(T entity) implements ServerEntityManagerMessage {}
+    public record StopTracking<T extends EntityLike>(T entity) implements ServerEntityManagerMessage {}
+    public record HandlerDestroy(Object o) implements ServerEntityManagerMessage {}
+    public record HandlerUpdateLoadStatus(Object o) implements ServerEntityManagerMessage {}
+    public record EntityUuidsRemove(UUID uuid) implements ServerEntityManagerMessage {}
+
+    public record RequestCacheTrackingSection<T extends EntityLike>(long sectionPos, ActorRef<EntityTrackingSection<T>> replyTo) implements ServerEntityManagerMessage {}
+//    public record ResponseCacheTrackingSection<T extends EntityLike>(EntityTrackingSection<T> entityTrackingSection) implements ServerEntityManagerMessageResponse {}
+
 }

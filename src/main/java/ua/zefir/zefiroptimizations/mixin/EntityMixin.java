@@ -29,17 +29,17 @@ public abstract class EntityMixin {
 //    @Unique
 //    Timeout timeout = new Timeout(Duration.create(5, TimeUnit.SECONDS));
 
-    @Inject(method = "setRemoved", at = @At("HEAD"), cancellable = true)
-    private void onSetRemoved(Entity.RemovalReason reason, CallbackInfo ci) {
-        Entity self = (Entity) (Object) this;
-
-        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread() && !(self instanceof PlayerEntity)) {
-            ZefirOptimizations.SERVER.execute(() -> {
-                self.setRemoved(reason);
-            });
-            ci.cancel();
-        }
-    }
+//    @Inject(method = "setRemoved", at = @At("HEAD"), cancellable = true)
+//    private void onSetRemoved(Entity.RemovalReason reason, CallbackInfo ci) {
+//        Entity self = (Entity) (Object) this;
+//
+//        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread() && !(self instanceof PlayerEntity)) {
+//            ZefirOptimizations.SERVER.execute(() -> {
+//                self.setRemoved(reason);
+//            });
+//            ci.cancel();
+//        }
+//    }
 
 //    @Inject(method = "move", at = @At("HEAD"), cancellable = true)
 //    private void onMove(MovementType movementType, Vec3d movement, CallbackInfo ci) {

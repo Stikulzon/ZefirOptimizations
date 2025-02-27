@@ -77,7 +77,7 @@ public abstract class LivingEntityMixin extends Entity {
     }
 
     @Inject(method = "tickCramming", at = @At("HEAD"), cancellable = true)
-    private void onTravel(CallbackInfo ci) {
+    private void onTickCramming(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
         if(!(self instanceof PlayerEntity)) {
             if (Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {

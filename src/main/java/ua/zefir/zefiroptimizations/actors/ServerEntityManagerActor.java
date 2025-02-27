@@ -5,9 +5,16 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
+import com.google.common.collect.Lists;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.boss.dragon.EnderDragonEntity;
+import net.minecraft.entity.boss.dragon.EnderDragonPart;
 import net.minecraft.server.world.ServerEntityManager;
+import net.minecraft.util.function.LazyIterationConsumer;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
+import ua.zefir.zefiroptimizations.mixin.ServerEntityManagerAccessor;
+
+import java.util.List;
 
 public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManagerMessages.ServerEntityManagerMessage> {
     private final ServerEntityManager<Entity> entityManager;
@@ -43,14 +50,129 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
                 .onMessage(ServerEntityManagerMessages.RequestIndexSize.class, this::requestIndexSize)
 
                 // Lookup operations
-                .onMessage(ServerEntityManagerMessages.RequestEntityLookupByUuid.class, this::requestEntityLookupByUuid)
-                .onMessage(ServerEntityManagerMessages.RequestEntityLookupById.class, this::requestEntityLookupById)
-                .onMessage(ServerEntityManagerMessages.RequestEntityLookupIterable.class, this::requestEntityLookupIterable)
                 .onMessage(ServerEntityManagerMessages.EntityLookupForEachIntersects.class, (msg) -> {this.entityManager.getLookup().forEachIntersects(msg.box(), msg.action()); return this;})
                 .onMessage(ServerEntityManagerMessages.EntityLookupForEachIntersectsTypeFilter.class, (msg) -> {this.entityManager.getLookup().forEachIntersects(msg.filter(), msg.box(), msg.consumer()); return this;})
                 .onMessage(ServerEntityManagerMessages.EntityLookupForEach.class, (msg) -> {this.entityManager.getLookup().forEach(msg.filter(), msg.consumer()); return this;})
+                .onMessage(ServerEntityManagerMessages.RequestEntityLookupByUuid.class, this::requestEntityLookupByUuid)
+                .onMessage(ServerEntityManagerMessages.RequestEntityLookupById.class, this::requestEntityLookupById)
+                .onMessage(ServerEntityManagerMessages.RequestEntityLookupIterable.class, this::requestEntityLookupIterable)
+                .onMessage(ServerEntityManagerMessages.RequestOtherEntities.class, this::requestOtherEntities)
+                .onMessage(ServerEntityManagerMessages.RequestEntitiesByTypeWorld.class, this::requestEntitiesByTypeWorld)
+                .onMessage(ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld.class, this::requestEntitiesByTypeServerWorld)
+
+                // Listener
+                .onMessage(ServerEntityManagerMessages.EntityLeftSection.class, this::entityLeftSection)
+                .onMessage(ServerEntityManagerMessages.StartTicking.class, this::startTicking)
+                .onMessage(ServerEntityManagerMessages.StopTicking.class, this::stopTicking)
+                .onMessage(ServerEntityManagerMessages.StartTracking.class, this::startTracking)
+                .onMessage(ServerEntityManagerMessages.StopTracking.class, this::stopTracking)
+                .onMessage(ServerEntityManagerMessages.RequestCacheTrackingSection.class, this::cacheGetTrackingSection)
+                .onMessage(ServerEntityManagerMessages.RequestCacheTrackingSection.class, this::cacheGetTrackingSection)
+                .onMessage(ServerEntityManagerMessages.EntityUuidsRemove.class, this::entityUuidsRemove)
 
                 .build();
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> entityUuidsRemove(ServerEntityManagerMessages.EntityUuidsRemove msg) {
+        ((ServerEntityManagerAccessor)this.entityManager).getEntityUuids().remove(msg.uuid());
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> cacheGetTrackingSection(ServerEntityManagerMessages.RequestCacheTrackingSection msg) {
+        var result = ((ServerEntityManagerAccessor)this.entityManager).getCache().getTrackingSection(msg.sectionPos());
+        msg.replyTo().tell(result);
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> stopTracking(ServerEntityManagerMessages.StopTracking msg) {
+        ((ServerEntityManagerAccessor)this.entityManager).invokeStopTracking(msg.entity());
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> startTracking(ServerEntityManagerMessages.StartTracking msg) {
+        ((ServerEntityManagerAccessor)this.entityManager).invokeStartTracking(msg.entity());
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> stopTicking(ServerEntityManagerMessages.StopTicking msg) {
+        ((ServerEntityManagerAccessor)this.entityManager).invokeStopTicking(msg.entity());
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> startTicking(ServerEntityManagerMessages.StartTicking msg) {
+        ((ServerEntityManagerAccessor)this.entityManager).invokeStartTicking(msg.entity());
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> entityLeftSection(ServerEntityManagerMessages.EntityLeftSection msg) {
+        ((ServerEntityManagerAccessor)this.entityManager).invokeEntityLeftSection(msg.sectionPos(), msg.section());
+        return this;
+    }
+
+    // I need to find a better approach than just copying original code
+    private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeServerWorld(ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld msg) {
+        List<? super T> result = Lists.newArrayList();
+
+        this.entityManager.getLookup().forEach(msg.filter(), entity -> {
+            if (msg.predicate().test(entity)) {
+                result.add((T) entity);
+                if (result.size() >= msg.limit()) {
+                    return LazyIterationConsumer.NextIteration.ABORT;
+                }
+            }
+
+            return LazyIterationConsumer.NextIteration.CONTINUE;
+        });
+        msg.replyTo().tell(result);
+        return this;
+    }
+
+    private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeWorld(ServerEntityManagerMessages.RequestEntitiesByTypeWorld msg) {
+        List<? super T> result = Lists.newArrayList();
+
+        this.entityManager.getLookup().forEachIntersects(msg.filter(), msg.box(), entity -> {
+            if (msg.predicate().test(entity)) {
+                result.add((T) entity);
+                if (result.size() >= msg.limit()) {
+                    return LazyIterationConsumer.NextIteration.ABORT;
+                }
+            }
+
+            if (entity instanceof EnderDragonEntity enderDragonEntity) {
+                for (EnderDragonPart enderDragonPart : enderDragonEntity.getBodyParts()) {
+                    T entity2 = (T) msg.filter().downcast(enderDragonPart);
+                    if (entity2 != null && msg.predicate().test(entity2)) {
+                        result.add(entity2);
+                        if (result.size() >= msg.limit()) {
+                            return LazyIterationConsumer.NextIteration.ABORT;
+                        }
+                    }
+                }
+            }
+
+            return LazyIterationConsumer.NextIteration.CONTINUE;
+        });
+        msg.replyTo().tell(result);
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestOtherEntities(ServerEntityManagerMessages.RequestOtherEntities msg) {
+        List<Entity> list = Lists.<Entity>newArrayList();
+        this.entityManager.getLookup().forEachIntersects(msg.box(), entity -> {
+            if (entity != msg.except() && msg.predicate().test(entity)) {
+                list.add(entity);
+            }
+
+            if (entity instanceof EnderDragonEntity) {
+                for (EnderDragonPart enderDragonPart : ((EnderDragonEntity)entity).getBodyParts()) {
+                    if (entity != msg.except() && msg.predicate().test(enderDragonPart)) {
+                        list.add(enderDragonPart);
+                    }
+                }
+            }
+        });
+        msg.replyTo().tell(list);
+        return this;
     }
 
 
@@ -103,6 +225,7 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
         msg.replyTo().tell(new ServerEntityManagerMessages.ResponseEntityLookupEntity(entity));
         return this;
     }
+
 
     public Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntityLookupById(ServerEntityManagerMessages.RequestEntityLookupById msg) {
         Entity entity = this.entityManager.getLookup().get(msg.id());

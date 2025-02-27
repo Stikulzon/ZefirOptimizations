@@ -46,14 +46,14 @@ public abstract class MobEntityMixin extends LivingEntityMixin {
     }
 
 
-    @Inject(method = "tickNewAi", at = @At("HEAD"), cancellable = true)
-    private void onTickNewAi(CallbackInfo ci) {
-        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()){
-            System.out.println("Ticking new ai on thread: " + Thread.currentThread().getName());
-            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-            for (StackTraceElement element : stackTrace) {
-                System.out.println(element);
-            }
-        }
-    }
+//    @Inject(method = "tickNewAi", at = @At("HEAD"))
+//    private void onTickNewAi(CallbackInfo ci) {
+//        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()){
+//            System.out.println("Ticking new ai on thread: " + Thread.currentThread().getName());
+//            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+//            for (StackTraceElement element : stackTrace) {
+//                System.out.println(element);
+//            }
+//        }
+//    }
 }
