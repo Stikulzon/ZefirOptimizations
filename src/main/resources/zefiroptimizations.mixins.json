@@ -7,11 +7,8 @@
     "ArmorStandEntityMixin",
     "BubbleColumnBlockMixin",
     "EntityAccessor",
-    "EntityIndexMixin",
-    "EntityListMixin",
     "EntityMixin",
     "EntityTrackingSectionMixin",
-    "EntityViewMixin",
     "FollowParentGoalMixin",
     "ItemEntityMixin",
     "LivingEntityAccessor",
@@ -27,7 +24,10 @@
     "ServerWorldMixin",
     "SimpleEntityLookupMixin",
     "SpawnHelperMixin",
-    "WorldMixin"
+    "WorldMixin",
+    "clonable.BoxMixin",
+    "clonable.EntityMixin",
+    "clonable.TypeFilterMixin"
   ],
   "injectors": {
     "defaultRequire": 1

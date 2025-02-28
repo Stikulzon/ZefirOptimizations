@@ -2,8 +2,6 @@ package ua.zefir.zefiroptimizations.mixin;
 
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.javadsl.AskPattern;
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.entity.Entity;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
@@ -11,7 +9,6 @@ import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.TypeFilter;
-import net.minecraft.util.math.Box;
 import net.minecraft.util.math.random.RandomSequencesState;
 import net.minecraft.world.World;
 import net.minecraft.world.dimension.DimensionOptions;

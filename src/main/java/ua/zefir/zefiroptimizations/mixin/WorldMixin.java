@@ -21,7 +21,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
 import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
+import ua.zefir.zefiroptimizations.data.BoxAccessor;
 import ua.zefir.zefiroptimizations.data.CheckedThreadLocalRandom;
+import ua.zefir.zefiroptimizations.data.EntityAccessor;
 
 import java.time.Duration;
 import java.util.List;
@@ -62,7 +64,10 @@ public class WorldMixin {
             CompletionStage<List<Entity>> resultFuture =
                     AskPattern.ask(
                             this.entityManagerActor,
-                            replyTo -> new ServerEntityManagerMessages.RequestOtherEntities(except, box, predicate, replyTo),
+                            replyTo -> {
+                                assert except != null;
+                                return new ServerEntityManagerMessages.RequestOtherEntities(((EntityAccessor) except).clone(), ((BoxAccessor) box).clone(), predicate, replyTo);
+                            },
                             Duration.ofSeconds(3),
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
@@ -74,10 +79,10 @@ public class WorldMixin {
             }
     }
 
-    @Inject(method = "getOtherEntities", at = @At("TAIL"), cancellable = true)
-    private void onGetOtherEntitiesCheck(@Nullable Entity except, Box box, Predicate<? super Entity> predicate, CallbackInfoReturnable<List<Entity>> cir) {
-        System.out.println("This should never happen");
-    }
+//    @Inject(method = "getOtherEntities", at = @At("TAIL"))
+//    private void onGetOtherEntitiesCheck(@Nullable Entity except, Box box, Predicate<? super Entity> predicate, CallbackInfoReturnable<List<Entity>> cir) {
+//        System.out.println("This should never happen");
+//    }
 
     @Inject(method = "collectEntitiesByType(Lnet/minecraft/util/TypeFilter;Lnet/minecraft/util/math/Box;Ljava/util/function/Predicate;Ljava/util/List;I)V", at = @At("HEAD"), cancellable = true)
     private <T extends Entity> void onCollectEntitiesByType(TypeFilter<Entity, T> filter, Box box, Predicate<? super T> predicate, List<? super T> result, int limit, CallbackInfo ci) {
@@ -100,7 +105,7 @@ public class WorldMixin {
             CompletionStage<List<? extends T>> resultFuture =
                     AskPattern.ask(
                             this.entityManagerActor,
-                            replyTo -> new ServerEntityManagerMessages.RequestEntitiesByTypeWorld<>(filter, box, predicate, limit, self, replyTo),
+                            replyTo -> new ServerEntityManagerMessages.RequestEntitiesByTypeWorld<>(filter, ((BoxAccessor) box).clone(), predicate, limit, self, replyTo),
                             Duration.ofSeconds(3),
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
