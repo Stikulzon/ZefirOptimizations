@@ -21,9 +21,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
 import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
-import ua.zefir.zefiroptimizations.data.BoxAccessor;
 import ua.zefir.zefiroptimizations.data.CheckedThreadLocalRandom;
-import ua.zefir.zefiroptimizations.data.EntityAccessor;
 
 import java.time.Duration;
 import java.util.List;
@@ -65,8 +63,8 @@ public class WorldMixin {
                     AskPattern.ask(
                             this.entityManagerActor,
                             replyTo -> {
-                                assert except != null;
-                                return new ServerEntityManagerMessages.RequestOtherEntities(((EntityAccessor) except).clone(), ((BoxAccessor) box).clone(), predicate, replyTo);
+                                ServerEntityManagerMessages.RequestOtherEntities originalRequest = new ServerEntityManagerMessages.RequestOtherEntities(except, box, predicate, replyTo);;
+                                return new ServerEntityManagerMessages.RequestOtherEntities(originalRequest);
                             },
                             Duration.ofSeconds(3),
                             ZefirOptimizations.getActorSystem().scheduler());
@@ -102,10 +100,14 @@ public class WorldMixin {
             }
         }
 
+
             CompletionStage<List<? extends T>> resultFuture =
                     AskPattern.ask(
                             this.entityManagerActor,
-                            replyTo -> new ServerEntityManagerMessages.RequestEntitiesByTypeWorld<>(filter, ((BoxAccessor) box).clone(), predicate, limit, self, replyTo),
+                            replyTo -> {
+                                ServerEntityManagerMessages.RequestEntitiesByTypeWorld<T> originalRequest = new ServerEntityManagerMessages.RequestEntitiesByTypeWorld<>(filter, box, predicate, limit, self, replyTo);
+                                return new ServerEntityManagerMessages.RequestEntitiesByTypeWorld<>(originalRequest);
+                            },
                             Duration.ofSeconds(3),
                             ZefirOptimizations.getActorSystem().scheduler());
             try {

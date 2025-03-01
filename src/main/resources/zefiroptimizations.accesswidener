@@ -7,3 +7,4 @@ accessible field net/minecraft/world/chunk/PalettedContainer$Data storage Lnet/m
 accessible method net/minecraft/world/chunk/PalettedContainer$PaletteProvider getBits (Lnet/minecraft/util/collection/IndexedIterable;I)I
 
 accessible method net/minecraft/world/entity/SectionedEntityCache chunkPosFromSectionPos (J)J
+accessible field net/minecraft/server/world/ServerEntityManager handler Lnet/minecraft/world/entity/EntityHandler;

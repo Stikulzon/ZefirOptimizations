@@ -18,6 +18,7 @@ import java.util.List;
 
 public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManagerMessages.ServerEntityManagerMessage> {
     private final ServerEntityManager<Entity> entityManager;
+    private int concurrentModificationCheck = 0;
 
     public static Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> create(ServerEntityManager<Entity> entityManager) {
         return Behaviors.setup(context -> new ServerEntityManagerActor(context, entityManager));
@@ -69,8 +70,20 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
                 .onMessage(ServerEntityManagerMessages.RequestCacheTrackingSection.class, this::cacheGetTrackingSection)
                 .onMessage(ServerEntityManagerMessages.RequestCacheTrackingSection.class, this::cacheGetTrackingSection)
                 .onMessage(ServerEntityManagerMessages.EntityUuidsRemove.class, this::entityUuidsRemove)
+                .onMessage(ServerEntityManagerMessages.HandlerDestroy.class, this::handlerDestroy)
+                .onMessage(ServerEntityManagerMessages.HandlerUpdateLoadStatus.class, this::handlerUpdateLoadStatus)
 
                 .build();
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> handlerUpdateLoadStatus(ServerEntityManagerMessages.HandlerUpdateLoadStatus msg) {
+        entityManager.handler.updateLoadStatus((Entity) msg.entity());
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> handlerDestroy(ServerEntityManagerMessages.HandlerDestroy msg) {
+        entityManager.handler.destroy((Entity) msg.entity());
+        return this;
     }
 
     private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> entityUuidsRemove(ServerEntityManagerMessages.EntityUuidsRemove msg) {
@@ -111,6 +124,7 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
 
     // I need to find a better approach than just copying original code
     private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeServerWorld(ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld msg) {
+        concurrentModificationCheck++;
         List<? super T> result = Lists.newArrayList();
 
         this.entityManager.getLookup().forEach(msg.filter(), entity -> {
@@ -124,10 +138,15 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
             return LazyIterationConsumer.NextIteration.CONTINUE;
         });
         msg.replyTo().tell(result);
+        concurrentModificationCheck--;
+        if (concurrentModificationCheck != 0) {
+            throw new RuntimeException("Concurrent modification check failed");
+        }
         return this;
     }
 
     private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeWorld(ServerEntityManagerMessages.RequestEntitiesByTypeWorld msg) {
+        concurrentModificationCheck++;
         List<? super T> result = Lists.newArrayList();
 
         this.entityManager.getLookup().forEachIntersects(msg.filter(), msg.box(), entity -> {
@@ -153,10 +172,15 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
             return LazyIterationConsumer.NextIteration.CONTINUE;
         });
         msg.replyTo().tell(result);
+        concurrentModificationCheck--;
+        if (concurrentModificationCheck != 0) {
+            throw new RuntimeException("Concurrent modification check failed");
+        }
         return this;
     }
 
     private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestOtherEntities(ServerEntityManagerMessages.RequestOtherEntities msg) {
+        concurrentModificationCheck++;
         List<Entity> list = Lists.<Entity>newArrayList();
         this.entityManager.getLookup().forEachIntersects(msg.box(), entity -> {
             if (entity != msg.except() && msg.predicate().test(entity)) {
@@ -172,6 +196,10 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
             }
         });
         msg.replyTo().tell(list);
+        concurrentModificationCheck--;
+        if (concurrentModificationCheck != 0) {
+            throw new RuntimeException("Concurrent modification check failed");
+        }
         return this;
     }
 

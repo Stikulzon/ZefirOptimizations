@@ -76,27 +76,27 @@ public abstract class LivingEntityMixin extends Entity {
         }
     }
 
-    @Inject(method = "tickCramming", at = @At("HEAD"), cancellable = true)
-    private void onTickCramming(CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if(!(self instanceof PlayerEntity)) {
-            if (Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
-                CompletableFuture<Void> future = new CompletableFuture<>();
-
-                // This is bad
-                ZefirOptimizations.SERVER.executeSync(() -> {
-                    ((LivingEntityAccessor) this).invokeTickCramming();
-                    future.complete(null);
-                });
-
-                try {
-                    future.get();
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-
-                ci.cancel();
-            }
-        }
-    }
+//    @Inject(method = "tickCramming", at = @At("HEAD"), cancellable = true)
+//    private void onTickCramming(CallbackInfo ci) {
+//        LivingEntity self = (LivingEntity) (Object) this;
+//        if(!(self instanceof PlayerEntity)) {
+//            if (Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
+//                CompletableFuture<Void> future = new CompletableFuture<>();
+//
+//                // This is bad
+//                ZefirOptimizations.SERVER.executeSync(() -> {
+//                    ((LivingEntityAccessor) this).invokeTickCramming();
+//                    future.complete(null);
+//                });
+//
+//                try {
+//                    future.get();
+//                } catch (Exception e) {
+//                    throw new RuntimeException(e);
+//                }
+//
+//                ci.cancel();
+//            }
+//        }
+//    }
 }

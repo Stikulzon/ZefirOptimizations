@@ -26,8 +26,7 @@
     "SpawnHelperMixin",
     "WorldMixin",
     "clonable.BoxMixin",
-    "clonable.EntityMixin",
-    "clonable.TypeFilterMixin"
+    "clonable.EntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1

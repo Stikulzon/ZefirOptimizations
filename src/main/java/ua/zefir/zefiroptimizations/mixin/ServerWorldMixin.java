@@ -86,7 +86,10 @@ public class ServerWorldMixin  {
             CompletionStage<List<? extends T>> resultFuture =
                     AskPattern.ask(
                             this.entityManagerActor,
-                            replyTo -> new ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld<>(filter, predicate, limit, replyTo),
+                            replyTo -> {
+                                ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld<T> originalRequest = new ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld<>(filter, predicate, limit, replyTo);
+                                return new ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld<>(originalRequest);
+                            },
                             Duration.ofSeconds(3),
                             ZefirOptimizations.getActorSystem().scheduler());
             try {

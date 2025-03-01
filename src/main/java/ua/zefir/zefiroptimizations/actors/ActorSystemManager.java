@@ -19,7 +19,6 @@ import ua.zefir.zefiroptimizations.data.ServerEntityManagerRef;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.ActorSystemManagerMessage> {
 

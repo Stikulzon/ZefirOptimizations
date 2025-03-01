@@ -2,6 +2,7 @@ package ua.zefir.zefiroptimizations.mixin;
 
 import akka.actor.typed.javadsl.AskPattern;
 import net.minecraft.server.world.ServerEntityManager;
+import net.minecraft.world.entity.EntityHandler;
 import net.minecraft.world.entity.EntityLike;
 import net.minecraft.world.entity.EntityTrackingSection;
 import net.minecraft.world.entity.SectionedEntityCache;
@@ -28,6 +29,18 @@ public class ServerEntityManager$ListenerMixin<T extends EntityLike> {
     private void redirectEntityLeftSection(ServerEntityManager instance, long sectionPos, EntityTrackingSection<T> section) {
         ((ServerEntityManagerRef) manager).getEntityManagerActor()
                 .tell(new ServerEntityManagerMessages.EntityLeftSection<>(sectionPos, section));
+    }
+
+    @Redirect(method = "updateLoadStatus", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/EntityHandler;updateLoadStatus(Ljava/lang/Object;)V", ordinal = 0))
+    private <P> void redirectHandlerUpdateLoadStatus(EntityHandler instance, P t) {
+        ((ServerEntityManagerRef) manager).getEntityManagerActor()
+                .tell(new ServerEntityManagerMessages.HandlerUpdateLoadStatus<>(t));
+    }
+
+    @Redirect(method = "updateLoadStatus", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/EntityHandler;updateLoadStatus(Ljava/lang/Object;)V", ordinal = 1))
+    private <P> void redirectHandlerUpdateLoadStatus2(EntityHandler instance, P t) {
+        ((ServerEntityManagerRef) manager).getEntityManagerActor()
+                .tell(new ServerEntityManagerMessages.HandlerUpdateLoadStatus<>(t));
     }
 
     @Redirect(method = "updateLoadStatus", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerEntityManager;stopTracking(Lnet/minecraft/world/entity/EntityLike;)V"))
@@ -64,6 +77,12 @@ public class ServerEntityManager$ListenerMixin<T extends EntityLike> {
     private void redirectStopTracking$remove(ServerEntityManager instance, T entity) {
         ((ServerEntityManagerRef) instance).getEntityManagerActor()
                 .tell(new ServerEntityManagerMessages.StopTracking<>(entity));
+    }
+
+    @Redirect(method = "remove", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/EntityHandler;destroy(Ljava/lang/Object;)V"))
+    private <P> void redirectHandlerDestroy(EntityHandler instance, P t) {
+        ((ServerEntityManagerRef) manager).getEntityManagerActor()
+                .tell(new ServerEntityManagerMessages.HandlerDestroy<>(t));
     }
 
     @Redirect(method = "remove", at = @At(value = "INVOKE", target = "Ljava/util/Set;remove(Ljava/lang/Object;)Z"))
