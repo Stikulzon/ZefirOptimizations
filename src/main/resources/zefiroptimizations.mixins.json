@@ -24,9 +24,7 @@
     "ServerWorldMixin",
     "SimpleEntityLookupMixin",
     "SpawnHelperMixin",
-    "WorldMixin",
-    "clonable.BoxMixin",
-    "clonable.EntityMixin"
+    "WorldMixin"
   ],
   "injectors": {
     "defaultRequire": 1
