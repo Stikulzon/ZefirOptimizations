@@ -1,6 +1,7 @@
 package ua.zefir.zefiroptimizations.mixin;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.storage.ChunkDataAccess;
@@ -10,10 +11,15 @@ import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.data.DummySectionedEntityCache;
+import ua.zefir.zefiroptimizations.data.ServerEntityManagerRef;
+
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 @Mixin(ServerEntityManager.class)
 public abstract class ServerEntityManagerMixin<T extends EntityLike>{
@@ -24,9 +30,99 @@ public abstract class ServerEntityManagerMixin<T extends EntityLike>{
     @Shadow @Final private Long2ObjectMap<EntityTrackingStatus> trackingStatuses;
 
     @Inject(method = "<init>", at = @At(
-            value = "TAIL"))
+            value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/Long2ObjectMap;defaultReturnValue(Ljava/lang/Object;)V", shift = At.Shift.AFTER))
     private void init(Class entityClass, EntityHandler handler, ChunkDataAccess dataAccess, CallbackInfo ci) {
         cache = new DummySectionedEntityCache<>(entityClass, this.trackingStatuses);
+    }
+
+    @Redirect(method = "entityLeftSection",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;removeSection(J)V"
+            )
+    )
+    private void redirectEntityLeftSection(SectionedEntityCache<T> instance, long sectionPos) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        ((DummySectionedEntityCache<T>) cache).removeSection(sectionPos, ((ServerEntityManagerRef) self).getEntityManagerActor());
+    }
+
+    @Redirect(method = "addEntity(Lnet/minecraft/world/entity/EntityLike;Z)Z",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;getTrackingSection(J)Lnet/minecraft/world/entity/EntityTrackingSection;"
+            )
+    )
+    private EntityTrackingSection<T> redirectAddEntity(SectionedEntityCache<T> instance, long sectionPos) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        return ((DummySectionedEntityCache<T>) cache).getTrackingSection(sectionPos, ((ServerEntityManagerRef) self).getEntityManagerActor());
+    }
+
+    @Redirect(method = "updateTrackingStatus(Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/world/entity/EntityTrackingStatus;)V",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;getTrackingSections(J)Ljava/util/stream/Stream;"
+            )
+    )
+    private Stream<EntityTrackingSection<T>> redirectGetTrackingSections(SectionedEntityCache instance, long chunkPos) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        return ((DummySectionedEntityCache<T>) cache).getTrackingSections(chunkPos, ((ServerEntityManagerRef) self).getEntityManagerActor());
+    }
+
+    @Redirect(method = "trySave",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;getTrackingSections(J)Ljava/util/stream/Stream;"
+            )
+    )
+    private Stream<EntityTrackingSection<T>> redirectGetTrackingSections2(SectionedEntityCache instance, long chunkPos) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        return ((DummySectionedEntityCache<T>) cache).getTrackingSections(chunkPos, ((ServerEntityManagerRef) self).getEntityManagerActor());
+    }
+
+    @Redirect(method = "getLoadedChunks",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;getChunkPositions()Lit/unimi/dsi/fastutil/longs/LongSet;"
+            )
+    )
+    private LongSet redirectGetChunkPositions(SectionedEntityCache instance) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        return ((DummySectionedEntityCache<T>) cache).getChunkPositions(((ServerEntityManagerRef) self).getEntityManagerActor());
+    }
+
+    @Redirect(method = "dump",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;getChunkPositions()Lit/unimi/dsi/fastutil/longs/LongSet;"
+            )
+    )
+    private LongSet redirectGetChunkPositions2(SectionedEntityCache instance) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        return ((DummySectionedEntityCache<T>) cache).getChunkPositions(((ServerEntityManagerRef) self).getEntityManagerActor());
+    }
+
+    @Redirect(method = "method_31813",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;getSections(J)Ljava/util/stream/LongStream;"
+            )
+    )
+    private LongStream redirectGetSections(SectionedEntityCache instance, long chunkPos) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        return ((DummySectionedEntityCache<T>) cache).getSections(chunkPos, ((ServerEntityManagerRef) self).getEntityManagerActor());
+    }
+
+    @Redirect(method = "method_31814",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;findTrackingSection(J)Lnet/minecraft/world/entity/EntityTrackingSection;"
+            )
+    )
+    private EntityTrackingSection<T> redirectFindTrackingSection(SectionedEntityCache instance, long chunkPos) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        return ((DummySectionedEntityCache<T>) cache).findTrackingSection(chunkPos, ((ServerEntityManagerRef) self).getEntityManagerActor());
+    }
+
+    @Redirect(method = "getDebugString",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/entity/SectionedEntityCache;sectionCount()I"
+            )
+    )
+    private int redirectSectionCount(SectionedEntityCache instance) {
+        ServerEntityManager<T> self = (ServerEntityManager<T>) (Object) this;
+        return ((DummySectionedEntityCache<T>) cache).sectionCount(((ServerEntityManagerRef) self).getEntityManagerActor());
     }
 
 //    @Inject(method = "<init>", at = @At(
