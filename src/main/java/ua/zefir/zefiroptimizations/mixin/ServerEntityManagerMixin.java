@@ -1,20 +1,33 @@
 package ua.zefir.zefiroptimizations.mixin;
 
-import akka.actor.typed.ActorRef;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.server.world.ServerEntityManager;
-import net.minecraft.world.entity.EntityLike;
-import net.minecraft.world.entity.EntityLookup;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.storage.ChunkDataAccess;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Mutable;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
-import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
-import ua.zefir.zefiroptimizations.data.ServerEntityManagerRef;
+import ua.zefir.zefiroptimizations.data.DummySectionedEntityCache;
 
 @Mixin(ServerEntityManager.class)
-public class ServerEntityManagerMixin<T extends EntityLike>{
+public abstract class ServerEntityManagerMixin<T extends EntityLike>{
+
+    @Shadow @Final @Mutable
+    SectionedEntityCache<T> cache;
+
+    @Shadow @Final private Long2ObjectMap<EntityTrackingStatus> trackingStatuses;
+
+    @Inject(method = "<init>", at = @At(
+            value = "TAIL"))
+    private void init(Class entityClass, EntityHandler handler, ChunkDataAccess dataAccess, CallbackInfo ci) {
+        cache = new DummySectionedEntityCache<>(entityClass, this.trackingStatuses);
+    }
 
 //    @Inject(method = "<init>", at = @At(
 //            value = "TAIL"))

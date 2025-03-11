@@ -11,6 +11,7 @@ import net.minecraft.entity.boss.dragon.EnderDragonEntity;
 import net.minecraft.entity.boss.dragon.EnderDragonPart;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.util.function.LazyIterationConsumer;
+import net.minecraft.world.entity.SectionedEntityCache;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
 import ua.zefir.zefiroptimizations.mixin.ServerEntityManagerAccessor;
 

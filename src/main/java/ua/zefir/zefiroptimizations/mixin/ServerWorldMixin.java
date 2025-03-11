@@ -26,6 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
 import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
+import ua.zefir.zefiroptimizations.data.CheckedServerEntityManager;
 import ua.zefir.zefiroptimizations.data.DummyEntityLookup;
 import ua.zefir.zefiroptimizations.data.DummyServerEntityManager;
 
@@ -47,7 +48,7 @@ public class ServerWorldMixin  {
             value = "NEW",
             target = "(Ljava/lang/Class;Lnet/minecraft/world/entity/EntityHandler;Lnet/minecraft/world/storage/ChunkDataAccess;)Lnet/minecraft/server/world/ServerEntityManager;"))
     private ServerEntityManager serverEntityManagerInit(Class entityClass, EntityHandler handler, ChunkDataAccess dataAccess, MinecraftServer server, Executor workerExecutor, LevelStorage.Session session, ServerWorldProperties properties, RegistryKey worldKey, DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState) {
-        ServerEntityManager<Entity> tempEntityManager = new ServerEntityManager<>(entityClass, handler, dataAccess);
+        ServerEntityManager<Entity> tempEntityManager = new CheckedServerEntityManager<>(entityClass, handler, dataAccess);
         return new DummyServerEntityManager<>(entityClass, handler, dataAccess, worldKey, tempEntityManager);
     }
 
