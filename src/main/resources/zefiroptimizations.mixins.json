@@ -18,13 +18,11 @@
     "MobEntityMixin",
     "PlayerEntityMixin",
     "SchoolingFishEntityMixin",
-    "SectionedEntityCacheMixin",
     "ServerEntityManager$ListenerMixin",
     "ServerEntityManagerAccessor",
     "ServerEntityManagerInterfaceMixin",
     "ServerEntityManagerMixin",
     "ServerWorldMixin",
-    "SimpleEntityLookupMixin",
     "SpawnHelperMixin",
     "WorldMixin"
   ],

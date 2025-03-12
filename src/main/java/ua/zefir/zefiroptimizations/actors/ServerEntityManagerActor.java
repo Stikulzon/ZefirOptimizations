@@ -11,7 +11,6 @@ import net.minecraft.entity.boss.dragon.EnderDragonEntity;
 import net.minecraft.entity.boss.dragon.EnderDragonPart;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.util.function.LazyIterationConsumer;
-import net.minecraft.world.entity.SectionedEntityCache;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
 import ua.zefir.zefiroptimizations.mixin.ServerEntityManagerAccessor;
 
@@ -142,7 +141,7 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
 
     private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeWorld(ServerEntityManagerMessages.RequestEntitiesByTypeWorld msg) {
         List<? super T> result = Lists.newArrayList();
-
+        System.out.println("Starting request entities by type");
         this.entityManager.getLookup().forEachIntersects(msg.filter(), msg.box(), entity -> {
             if (msg.predicate().test(entity)) {
                 result.add((T) entity);
@@ -165,6 +164,7 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
 
             return LazyIterationConsumer.NextIteration.CONTINUE;
         });
+        System.out.println("Finished request entities by type");
         msg.replyTo().tell(result);
         return this;
     }
@@ -214,8 +214,10 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
     }
 
     public Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestIsLoaded(ServerEntityManagerMessages.RequestIsLoaded msg) {
+        System.out.println("Starting request isLoaded");
         boolean result = this.entityManager.isLoaded(msg.chunkPos());
         msg.replyTo().tell(result);
+        System.out.println("Finished request isLoaded");
         return this;
     }
 

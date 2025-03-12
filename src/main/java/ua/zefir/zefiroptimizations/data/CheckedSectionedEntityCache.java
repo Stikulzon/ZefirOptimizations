@@ -15,10 +15,10 @@ import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
-public class DummySectionedEntityCache<T extends EntityLike> extends SectionedEntityCache<T> {
+public class CheckedSectionedEntityCache<T extends EntityLike> extends SectionedEntityCache<T> {
     private ActorRef<ServerEntityManagerMessages.ServerEntityManagerMessage> entityManagerActor;
     
-    public DummySectionedEntityCache(Class entityClass, Long2ObjectFunction chunkStatusDiscriminator)  {
+    public CheckedSectionedEntityCache(Class entityClass, Long2ObjectFunction chunkStatusDiscriminator)  {
         super(entityClass, chunkStatusDiscriminator);
     }
 
