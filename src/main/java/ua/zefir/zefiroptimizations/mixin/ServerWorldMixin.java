@@ -48,7 +48,7 @@ public class ServerWorldMixin  {
             value = "NEW",
             target = "(Ljava/lang/Class;Lnet/minecraft/world/entity/EntityHandler;Lnet/minecraft/world/storage/ChunkDataAccess;)Lnet/minecraft/server/world/ServerEntityManager;"))
     private ServerEntityManager serverEntityManagerInit(Class entityClass, EntityHandler handler, ChunkDataAccess dataAccess, MinecraftServer server, Executor workerExecutor, LevelStorage.Session session, ServerWorldProperties properties, RegistryKey worldKey, DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState) {
-        ServerEntityManager<Entity> tempEntityManager = new CheckedServerEntityManager<>(entityClass, handler, dataAccess);
+        ServerEntityManager<Entity> tempEntityManager = new ServerEntityManager<>(entityClass, handler, dataAccess);
         return new DummyServerEntityManager<>(entityClass, handler, dataAccess, worldKey, tempEntityManager);
     }
 
@@ -75,7 +75,7 @@ public class ServerWorldMixin  {
                     AskPattern.ask(
                             ZefirOptimizations.getActorSystem(),
                             replyTo -> new ZefirsActorMessages.RequestEntityManagerActorRef(self.getRegistryKey(), replyTo),
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 this.entityManagerActor = resultFuture.toCompletableFuture().get().entityManagerActor();
@@ -91,7 +91,7 @@ public class ServerWorldMixin  {
                                 ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld<T> originalRequest = new ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld<>(filter, predicate, limit, replyTo);
                                 return new ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld<>(originalRequest);
                             },
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 result.addAll(resultFuture.toCompletableFuture().get());

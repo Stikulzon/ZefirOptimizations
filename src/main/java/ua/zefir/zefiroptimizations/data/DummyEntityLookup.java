@@ -29,7 +29,7 @@ public class DummyEntityLookup<T extends EntityLike> implements EntityLookup<T> 
                 AskPattern.ask(
                         ZefirOptimizations.getActorSystem(),
                         replyTo -> new ZefirsActorMessages.RequestEntityManagerActorRef(worldRegistryKey, replyTo),
-                        Duration.ofSeconds(3),
+                        ZefirOptimizations.timeout,
                         ZefirOptimizations.getActorSystem().scheduler());
         try {
             this.entityManagerActor = resultFuture.toCompletableFuture().get().entityManagerActor();
@@ -44,7 +44,7 @@ public class DummyEntityLookup<T extends EntityLike> implements EntityLookup<T> 
                 AskPattern.ask(
                         entityManagerActor,
                         replyTo -> new ServerEntityManagerMessages.RequestEntityLookupById(id, replyTo),
-                        Duration.ofSeconds(3),
+                        ZefirOptimizations.timeout,
                         ZefirOptimizations.getActorSystem().scheduler());
         try {
             return (T) resultFuture.toCompletableFuture().get().entity();
@@ -59,7 +59,7 @@ public class DummyEntityLookup<T extends EntityLike> implements EntityLookup<T> 
                 AskPattern.ask(
                         entityManagerActor,
                         replyTo -> new ServerEntityManagerMessages.RequestEntityLookupByUuid(uuid, replyTo),
-                        Duration.ofSeconds(3),
+                        ZefirOptimizations.timeout,
                         ZefirOptimizations.getActorSystem().scheduler());
         try {
             return (T) resultFuture.toCompletableFuture().get().entity();
@@ -74,7 +74,7 @@ public class DummyEntityLookup<T extends EntityLike> implements EntityLookup<T> 
                 AskPattern.ask(
                         entityManagerActor,
                         ServerEntityManagerMessages.RequestEntityLookupIterable::new,
-                        Duration.ofSeconds(3),
+                        ZefirOptimizations.timeout,
                         ZefirOptimizations.getActorSystem().scheduler());
         try {
             return resultFuture.toCompletableFuture().get().iterable();

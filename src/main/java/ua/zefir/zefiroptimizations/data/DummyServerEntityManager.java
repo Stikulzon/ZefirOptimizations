@@ -34,7 +34,7 @@ public class DummyServerEntityManager<T extends EntityLike> extends ServerEntity
                 AskPattern.ask(
                         ZefirOptimizations.getActorSystem(),
                         replyTo -> new ZefirsActorMessages.ServerEntityManagerCreated<T>(entityManager, worldRegistryKey, replyTo),
-                        Duration.ofSeconds(3),
+                        ZefirOptimizations.timeout,
                         ZefirOptimizations.getActorSystem().scheduler());
         try {
             this.entityManagerActor = resultFuture.toCompletableFuture().get().entityManagerActor();
@@ -102,7 +102,7 @@ public class DummyServerEntityManager<T extends EntityLike> extends ServerEntity
                     AskPattern.ask(
                             this.entityManagerActor,
                             replyTo -> new ServerEntityManagerMessages.RequestAddEntity((Entity) entity, replyTo),
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 boolean result = resultFuture.toCompletableFuture().get();
@@ -118,7 +118,7 @@ public class DummyServerEntityManager<T extends EntityLike> extends ServerEntity
                     AskPattern.ask(
                             this.entityManagerActor,
                             replyTo -> new ServerEntityManagerMessages.RequestHas(uuid, replyTo),
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 boolean result = resultFuture.toCompletableFuture().get();
@@ -134,7 +134,7 @@ public class DummyServerEntityManager<T extends EntityLike> extends ServerEntity
                     AskPattern.ask(
                             this.entityManagerActor,
                             replyTo -> new ServerEntityManagerMessages.RequestIsLoaded(chunkPos, replyTo),
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 boolean result = resultFuture.toCompletableFuture().get();
@@ -150,7 +150,7 @@ public class DummyServerEntityManager<T extends EntityLike> extends ServerEntity
                     AskPattern.ask(
                             this.entityManagerActor,
                             replyTo -> new ServerEntityManagerMessages.RequestShouldTickBlockPos(pos, replyTo),
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 boolean result = resultFuture.toCompletableFuture().get();
@@ -166,7 +166,7 @@ public class DummyServerEntityManager<T extends EntityLike> extends ServerEntity
                     AskPattern.ask(
                             this.entityManagerActor,
                             replyTo -> new ServerEntityManagerMessages.RequestShouldTickChunkPos(pos, replyTo),
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 boolean result = resultFuture.toCompletableFuture().get();
@@ -183,7 +183,7 @@ public class DummyServerEntityManager<T extends EntityLike> extends ServerEntity
                     AskPattern.ask(
                             this.entityManagerActor,
                             ServerEntityManagerMessages.RequestDebugString::new,
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 String result = resultFuture.toCompletableFuture().get().debugString();
@@ -199,7 +199,7 @@ public class DummyServerEntityManager<T extends EntityLike> extends ServerEntity
                     AskPattern.ask(
                             this.entityManagerActor,
                             ServerEntityManagerMessages.RequestIndexSize::new,
-                            Duration.ofSeconds(3),
+                            ZefirOptimizations.timeout,
                             ZefirOptimizations.getActorSystem().scheduler());
             try {
                 int result = resultFuture.toCompletableFuture().get().indexSize();

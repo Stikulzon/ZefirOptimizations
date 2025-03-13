@@ -14,6 +14,8 @@ import ua.zefir.zefiroptimizations.actors.ActorSystemManager;
 import ua.zefir.zefiroptimizations.actors.MainThreadActor;
 import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
 
+import java.time.Duration;
+
 public class ZefirOptimizations implements ModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger("zefiroptimizations");
 	public static MinecraftServer SERVER;
@@ -21,6 +23,7 @@ public class ZefirOptimizations implements ModInitializer {
 	private static ActorSystem<ZefirsActorMessages.ActorSystemManagerMessage> actorSystem;
 	@Getter
 	private static ActorRef<ZefirsActorMessages.MainThreadMessage> mainThreadActor;
+	public static Duration timeout = Duration.ofSeconds(10);
 
 	@Override
 	public void onInitialize() {

@@ -104,7 +104,7 @@ public class ServerEntityManager$ListenerMixin<T extends EntityLike> {
                 AskPattern.ask(
                         ((ServerEntityManagerRef) manager).getEntityManagerActor(),
                         replyTo -> new ServerEntityManagerMessages.RequestCacheTrackingSection<>(sectionPos, replyTo),
-                        Duration.ofSeconds(3),
+                        ZefirOptimizations.timeout,
                         ZefirOptimizations.getActorSystem().scheduler());
         try {
             return resultFuture.toCompletableFuture().get();
