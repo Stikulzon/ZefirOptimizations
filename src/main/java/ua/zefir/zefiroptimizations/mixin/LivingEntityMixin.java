@@ -26,7 +26,7 @@ public abstract class LivingEntityMixin extends Entity {
     @Inject(method = "remove", at = @At("HEAD"))
     private void onRemove(Entity.RemovalReason reason, CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if (!self.getWorld().isClient && !(self instanceof PlayerEntity)) {
+        if (!self.getWorld().isClient) {
             ZefirOptimizations.getActorSystem()
                     .tell(new ZefirsActorMessages.EntityRemoved(self));
         }
@@ -54,21 +54,10 @@ public abstract class LivingEntityMixin extends Entity {
         }
     }
 
-    @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
-    private void onTick(CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if(!(self instanceof PlayerEntity)) {
-            if (Thread.currentThread() == ZefirOptimizations.SERVER.getThread()) {
-                ZefirOptimizations.getActorSystem().tell(new ZefirsActorMessages.TickSingleEntity(self));
-                ci.cancel();
-            }
-        }
-    }
-
     @Inject(method = "damage", at = @At("HEAD"), cancellable = true) // Fucked up
     private void onDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread() && !(self instanceof PlayerEntity)) {
+        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
             ZefirOptimizations.getMainThreadActor().tell(
                     new ZefirsActorMessages.ApplyDamage(self, source, amount)
             );
@@ -76,27 +65,4 @@ public abstract class LivingEntityMixin extends Entity {
         }
     }
 
-//    @Inject(method = "tickCramming", at = @At("HEAD"), cancellable = true)
-//    private void onTickCramming(CallbackInfo ci) {
-//        LivingEntity self = (LivingEntity) (Object) this;
-//        if(!(self instanceof PlayerEntity)) {
-//            if (Thread.currentThread() != ZefirOptimizations.SERVER.getThread()) {
-//                CompletableFuture<Void> future = new CompletableFuture<>();
-//
-//                // This is bad
-//                ZefirOptimizations.SERVER.executeSync(() -> {
-//                    ((LivingEntityAccessor) this).invokeTickCramming();
-//                    future.complete(null);
-//                });
-//
-//                try {
-//                    future.get();
-//                } catch (Exception e) {
-//                    throw new RuntimeException(e);
-//                }
-//
-//                ci.cancel();
-//            }
-//        }
-//    }
 }

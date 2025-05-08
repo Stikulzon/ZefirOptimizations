@@ -18,14 +18,14 @@ public abstract class MobEntityMixin extends LivingEntityMixin {
         super(type, world);
     }
 
-    @Inject(method = "<init>", at = @At("RETURN"))
-    private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (!world.isClient) {
-            ZefirOptimizations.getActorSystem()
-                    .tell(new ZefirsActorMessages.EntityCreated(self));
-        }
-    }
+//    @Inject(method = "<init>", at = @At("RETURN"))
+//    private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
+//        LivingEntity self = (LivingEntity) (Object) this;
+//        if (!world.isClient) {
+//            ZefirOptimizations.getActorSystem()
+//                    .tell(new ZefirsActorMessages.EntityCreated(self));
+//        }
+//    }
 
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;tick()V", shift = At.Shift.AFTER), cancellable = true)
     private void onTick(CallbackInfo ci) {

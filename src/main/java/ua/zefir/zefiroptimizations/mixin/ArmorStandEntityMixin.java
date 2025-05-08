@@ -17,12 +17,12 @@ public abstract class ArmorStandEntityMixin extends LivingEntityMixin  {
         super(type, world);
     }
 
-    @Inject(method = "<init>(Lnet/minecraft/entity/EntityType;Lnet/minecraft/world/World;)V", at = @At("RETURN"))
-    private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (!world.isClient) {
-            ZefirOptimizations.getActorSystem()
-                    .tell(new ZefirsActorMessages.EntityCreated(self));
-        }
-    }
+//    @Inject(method = "<init>(Lnet/minecraft/entity/EntityType;Lnet/minecraft/world/World;)V", at = @At("RETURN"))
+//    private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
+//        LivingEntity self = (LivingEntity) (Object) this;
+//        if (!world.isClient) {
+//            ZefirOptimizations.getActorSystem()
+//                    .tell(new ZefirsActorMessages.EntityCreated(self));
+//        }
+//    }
 }

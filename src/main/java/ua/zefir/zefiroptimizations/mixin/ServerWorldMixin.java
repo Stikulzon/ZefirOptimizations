@@ -66,6 +66,11 @@ public class ServerWorldMixin  {
         cir.setReturnValue(this.dummyEntityLookup);
     }
 
+    @Redirect(method = "tickEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;tick()V"))
+    private void onTickEntity(Entity instance) {
+        ZefirOptimizations.getActorSystem().tell(new ZefirsActorMessages.TickSingleEntity(instance));
+    }
+
     @Inject(method = "collectEntitiesByType(Lnet/minecraft/util/TypeFilter;Ljava/util/function/Predicate;Ljava/util/List;I)V", at = @At("HEAD"), cancellable = true)
     private <T extends Entity> void onCollectEntitiesByType(TypeFilter<Entity, T> filter, Predicate<? super T> predicate, List<? super T> result, int limit, CallbackInfo ci) {
         World self = (World) (Object) this;

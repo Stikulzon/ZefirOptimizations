@@ -141,7 +141,6 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
 
     private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeWorld(ServerEntityManagerMessages.RequestEntitiesByTypeWorld msg) {
         List<? super T> result = Lists.newArrayList();
-        System.out.println("Starting request entities by type");
         this.entityManager.getLookup().forEachIntersects(msg.filter(), msg.box(), entity -> {
             if (msg.predicate().test(entity)) {
                 result.add((T) entity);
@@ -164,28 +163,83 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
 
             return LazyIterationConsumer.NextIteration.CONTINUE;
         });
-        System.out.println("Finished request entities by type");
         msg.replyTo().tell(result);
         return this;
     }
 
     private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestOtherEntities(ServerEntityManagerMessages.RequestOtherEntities msg) {
-        List<Entity> list = Lists.<Entity>newArrayList();
-        this.entityManager.getLookup().forEachIntersects(msg.box(), entity -> {
-            if (entity != msg.except() && msg.predicate().test(entity)) {
-                list.add(entity);
-            }
+        // 1. Log entry
+        getContext().getLog().info("requestOtherEntities: Received request for box {}, except {}, predicate {}", msg.box(), msg.except(), msg.predicate().getClass().getName());
 
-            if (entity instanceof EnderDragonEntity) {
-                for (EnderDragonPart enderDragonPart : ((EnderDragonEntity)entity).getBodyParts()) {
-                    if (entity != msg.except() && msg.predicate().test(enderDragonPart)) {
-                        list.add(enderDragonPart);
+        List<Entity> list = Lists.<Entity>newArrayList();
+        try {
+            this.entityManager.getLookup().forEachIntersects(msg.box(), entity -> {
+                // 2. Log each entity being considered
+                // Be careful: this can be VERY verbose if many entities are in the box
+                getContext().getLog().info("requestOtherEntities: Checking entity {}", entity);
+
+                boolean shouldAdd = false;
+                if (entity != msg.except()) {
+                    // 3. Log before predicate test
+                    getContext().getLog().info("requestOtherEntities: Testing predicate for entity {}", entity);
+                    boolean predicateResult = msg.predicate().test(entity);
+                    // 4. Log after predicate test
+                    getContext().getLog().info("requestOtherEntities: Predicate for entity {} returned {}", entity, predicateResult);
+                    if (predicateResult) {
+                        list.add(entity);
+                        // 5. Log when entity added
+                        getContext().getLog().info("requestOtherEntities: Added entity {} to list", entity);
+                        shouldAdd = true; // Keep track if added
                     }
                 }
-            }
-        });
-        msg.replyTo().tell(list);
-        return this;
+
+                if (entity instanceof EnderDragonEntity enderDragonEntity) {
+                    // 6. Log EnderDragon found
+                    getContext().getLog().info("requestOtherEntities: Found EnderDragonEntity: {}", enderDragonEntity);
+                    for (EnderDragonPart enderDragonPart : enderDragonEntity.getBodyParts()) {
+                        // 7. Log each part
+                        getContext().getLog().info("requestOtherEntities: Checking EnderDragonPart {}", enderDragonPart);
+
+                        // CRITICAL BUG HERE: You are checking `entity != msg.except()`
+                        // instead of `enderDragonPart != msg.except()` for the parts.
+                        // If the main dragon entity is the one to be excepted, NO parts will be added.
+                        // This might not be the deadlock, but it's a significant functional bug.
+                        // Corrected logic:
+                        if (enderDragonPart != msg.except()) { // Check the part, not the main dragon
+                            // 8. Log before predicate test for part
+                            // getContext().getLog().debug("requestOtherEntities: Testing predicate for part {}", enderDragonPart);
+                            boolean partPredicateResult = msg.predicate().test(enderDragonPart);
+                            // 9. Log after predicate test for part
+                            getContext().getLog().info("requestOtherEntities: Predicate for part {} returned {}", enderDragonPart, partPredicateResult);
+                            if (partPredicateResult) {
+                                list.add(enderDragonPart);
+                                // 10. Log when part added
+                                getContext().getLog().info("requestOtherEntities: Added EnderDragonPart {} to list", enderDragonPart);
+                            }
+                        } else if (shouldAdd) { // If the main dragon was added, and this part IS the 'except', log it.
+                            getContext().getLog().warn("requestOtherEntities: EnderDragonPart {} was skipped because it's the 'except' entity, but main dragon was added.", enderDragonPart);
+                        }
+                    }
+                }
+            });
+
+            // 11. Log before replying
+            getContext().getLog().info("requestOtherEntities: Replying with list size: {}", list.size());
+            msg.replyTo().tell(list);
+            return this;
+
+        } catch (Throwable t) { // Catch EVERYTHING
+            // 12. CRITICAL: Log any exception
+            getContext().getLog().error("requestOtherEntities: CRITICAL ERROR during processing. Replying with empty list.", t);
+            // Ensure the asker gets a reply, even if it's an error or empty.
+            // Otherwise, the asker (main thread) will block forever on .get()
+            msg.replyTo().tell(Lists.newArrayList()); // Or a specific error message type
+            // Depending on the severity, you might want to stop the actor or return Behaviors.stopped()
+            // For now, just returning 'this' will allow it to process next message, but it might be in a bad state.
+            // If the error is unrecoverable, consider:
+            // return Behaviors.stopped(() -> getContext().getLog().error("Actor stopped due to unrecoverable error in requestOtherEntities"));
+            return this;
+        }
     }
 
 
@@ -214,10 +268,10 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
     }
 
     public Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestIsLoaded(ServerEntityManagerMessages.RequestIsLoaded msg) {
-        System.out.println("Starting request isLoaded");
+//        System.out.println("Starting request isLoaded");
         boolean result = this.entityManager.isLoaded(msg.chunkPos());
         msg.replyTo().tell(result);
-        System.out.println("Finished request isLoaded");
+//        System.out.println("Finished request isLoaded");
         return this;
     }
 

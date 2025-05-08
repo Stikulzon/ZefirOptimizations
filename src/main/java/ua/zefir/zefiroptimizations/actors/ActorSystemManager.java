@@ -7,6 +7,7 @@ import akka.actor.typed.Terminated;
 import akka.actor.typed.javadsl.*;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.server.world.ServerWorld;
@@ -22,7 +23,7 @@ import java.util.Map;
 
 public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.ActorSystemManagerMessage> {
 
-    private final Map<LivingEntity, ActorRef<ZefirsActorMessages.EntityMessage>> entityActors = new HashMap<>();
+    private final Map<Entity, ActorRef<ZefirsActorMessages.EntityMessage>> entityActors = new HashMap<>();
     private final Map<RegistryKey<World>, ActorRef<ServerEntityManagerMessages.ServerEntityManagerMessage>> entityManagerActors = new HashMap<>();
 
     public static Behavior<ZefirsActorMessages.ActorSystemManagerMessage> create() {
@@ -40,6 +41,7 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
                 .onMessage(ZefirsActorMessages.EntityCreated.class, this::handleEntityCreated)
                 .onMessage(ZefirsActorMessages.EntityRemoved.class, this::handleEntityRemoved)
                 .onMessage(ZefirsActorMessages.TickSingleEntity.class, this::handleAsyncSingleTick)
+                .onMessage(ZefirsActorMessages.TickPlayer.class, this::handleTickPlayer)
                 .onMessage(ZefirsActorMessages.ServerEntityManagerCreated.class, this::handleEntityManagerCreated)
                 .onMessage(ZefirsActorMessages.RequestEntityManagerActorRef.class, this::requestEntityManagerActorRef)
                 .onSignal(Terminated.class, this::onTerminated)
@@ -79,9 +81,18 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
         if (entityActor != null) {
             entityActor.tell(new ZefirsActorMessages.Tick());
         } else {
-//            System.out.println("entityActor are null for entity " + msg.entity());
+            System.out.println("entityActor are null for entity " + msg.entity());
         }
-//        System.out.println("Tick!");
+        return this;
+    }
+
+    private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> handleTickPlayer(ZefirsActorMessages.TickPlayer msg) {
+        ActorRef<ZefirsActorMessages.EntityMessage> entityActor = entityActors.get(msg.entity());
+        if (entityActor != null) {
+            entityActor.tell(new ZefirsActorMessages.TickPlayerActor());
+        } else {
+            System.out.println("entityActor are null for entity " + msg.entity());
+        }
         return this;
     }
 
@@ -99,7 +110,7 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
     }
 
     private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> handleEntityCreated(ZefirsActorMessages.EntityCreated msg) {
-        LivingEntity entity = msg.entity();
+        Entity entity = msg.entity();
 
         String actorName = "entityActor_" + entity.getUuid();
         if (getContext().getChild(actorName).isEmpty()) {
@@ -111,7 +122,7 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
     }
 
     private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> handleEntityRemoved(ZefirsActorMessages.EntityRemoved msg) {
-        LivingEntity entity = msg.entity();
+        Entity entity = msg.entity();
         ActorRef<ZefirsActorMessages.EntityMessage> entityActor = entityActors.remove(entity);
         if (entityActor != null) {
             getContext().stop(entityActor);

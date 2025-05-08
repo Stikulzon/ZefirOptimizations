@@ -22,6 +22,7 @@
     "ServerEntityManagerAccessor",
     "ServerEntityManagerInterfaceMixin",
     "ServerEntityManagerMixin",
+    "ServerPlayerEntityMixin",
     "ServerWorldMixin",
     "SpawnHelperMixin",
     "WorldMixin"
