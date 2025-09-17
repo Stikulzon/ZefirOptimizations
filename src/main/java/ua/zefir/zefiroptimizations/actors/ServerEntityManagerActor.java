@@ -9,12 +9,15 @@ import com.google.common.collect.Lists;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.boss.dragon.EnderDragonEntity;
 import net.minecraft.entity.boss.dragon.EnderDragonPart;
+import net.minecraft.predicate.entity.EntityPredicates;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.util.function.LazyIterationConsumer;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
+import ua.zefir.zefiroptimizations.data.DummyPredicate;
 import ua.zefir.zefiroptimizations.mixin.ServerEntityManagerAccessor;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManagerMessages.ServerEntityManagerMessage> {
     private final ServerEntityManager<Entity> entityManager;
@@ -170,32 +173,38 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
     private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestOtherEntities(ServerEntityManagerMessages.RequestOtherEntities msg) {
         // 1. Log entry
         getContext().getLog().info("requestOtherEntities: Received request for box {}, except {}, predicate {}", msg.box(), msg.except(), msg.predicate().getClass().getName());
+//        getContext().getLog().info(msg.predicate().getClass().getSimpleName());
+//        Predicate<Entity> predicate = msg.except() == null ? EntityPredicates.CAN_COLLIDE : EntityPredicates.EXCEPT_SPECTATOR.and(msg.except()::collidesWith);
 
         List<Entity> list = Lists.<Entity>newArrayList();
+//        getContext().getLog().info("msg.predicate() instanceof DummyPredicate {}", msg.predicate() instanceof DummyPredicate);
         try {
             this.entityManager.getLookup().forEachIntersects(msg.box(), entity -> {
                 // 2. Log each entity being considered
                 // Be careful: this can be VERY verbose if many entities are in the box
-                getContext().getLog().info("requestOtherEntities: Checking entity {}", entity);
+//                getContext().getLog().info("requestOtherEntities: Checking entity {}", entity);
 
                 boolean shouldAdd = false;
                 if (entity != msg.except()) {
                     // 3. Log before predicate test
-                    getContext().getLog().info("requestOtherEntities: Testing predicate for entity {}", entity);
+//                    getContext().getLog().info("requestOtherEntities: Testing predicate for entity {}", entity);
+//                    if(msg.predicate() instanceof DummyPredicate){
+//                        throw new RuntimeException("DummyPredicate " + entity);
+//                    }
                     boolean predicateResult = msg.predicate().test(entity);
                     // 4. Log after predicate test
-                    getContext().getLog().info("requestOtherEntities: Predicate for entity {} returned {}", entity, predicateResult);
+//                    getContext().getLog().info("requestOtherEntities: Predicate for entity {} returned {}", entity, predicateResult);
                     if (predicateResult) {
                         list.add(entity);
                         // 5. Log when entity added
-                        getContext().getLog().info("requestOtherEntities: Added entity {} to list", entity);
+//                        getContext().getLog().info("requestOtherEntities: Added entity {} to list", entity);
                         shouldAdd = true; // Keep track if added
                     }
                 }
 
                 if (entity instanceof EnderDragonEntity enderDragonEntity) {
                     // 6. Log EnderDragon found
-                    getContext().getLog().info("requestOtherEntities: Found EnderDragonEntity: {}", enderDragonEntity);
+//                    getContext().getLog().info("requestOtherEntities: Found EnderDragonEntity: {}", enderDragonEntity);
                     for (EnderDragonPart enderDragonPart : enderDragonEntity.getBodyParts()) {
                         // 7. Log each part
                         getContext().getLog().info("requestOtherEntities: Checking EnderDragonPart {}", enderDragonPart);
@@ -224,7 +233,7 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
             });
 
             // 11. Log before replying
-            getContext().getLog().info("requestOtherEntities: Replying with list size: {}", list.size());
+//            getContext().getLog().info("requestOtherEntities: Replying with list size: {}", list.size());
             msg.replyTo().tell(list);
             return this;
 

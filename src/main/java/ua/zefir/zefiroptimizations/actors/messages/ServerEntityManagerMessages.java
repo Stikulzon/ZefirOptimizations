@@ -65,19 +65,9 @@ public final class ServerEntityManagerMessages {
                     original.except,
                     new Box(original.box.minX, original.box.minY, original.box.minZ,
                             original.box.maxX, original.box.maxY, original.box.maxZ),
-                    copyPredicate(original.predicate),
+                    original.predicate,
                     original.replyTo
             );
-        }
-        private static <T> Predicate<? super T> copyPredicate(Predicate<? super T> original) {
-            if (original instanceof Cloneable) {
-                try {
-                    return (Predicate<? super T>) original.getClass().getMethod("clone").invoke(original);
-                } catch (Exception e) {
-                    System.err.println("Warning: Predicate is Cloneable but clone() method failed. Using shallow copy.");
-                }
-            }
-            return original;
         }
     }
     public record RequestEntitiesByTypeWorld<T extends Entity>(TypeFilter<Entity, T> filter, Box box,
@@ -90,21 +80,11 @@ public final class ServerEntityManagerMessages {
                     original.filter, // Shallow copy is OK (immutable)
                     new Box(original.box.minX, original.box.minY, original.box.minZ,
                             original.box.maxX, original.box.maxY, original.box.maxZ), // Deep copy of Box
-                    copyPredicate(original.predicate), // Attempt deep copy, fallback to shallow
+                    original.predicate, // Attempt deep copy, fallback to shallow
                     original.limit,
                     original.world,
                     original.replyTo
             );
-        }
-        private static <T> Predicate<? super T> copyPredicate(Predicate<? super T> original) {
-            if (original instanceof Cloneable) { //Cloneable check
-                try {
-                    return (Predicate<? super T>) original.getClass().getMethod("clone").invoke(original);
-                } catch (Exception e) {
-                    System.err.println("Warning: Predicate is Cloneable but clone() method failed. Using shallow copy.");
-                }
-            }
-            return original;
         }
     }
 
@@ -116,20 +96,10 @@ public final class ServerEntityManagerMessages {
         public RequestEntitiesByTypeServerWorld(RequestEntitiesByTypeServerWorld<T> original) {
             this(
                     original.filter,
-                    copyPredicate(original.predicate),
+                    original.predicate,
                     original.limit,
                     original.replyTo
             );
-        }
-        private static <T> Predicate<? super T> copyPredicate(Predicate<? super T> original) {
-            if (original instanceof Cloneable) {
-                try {
-                    return (Predicate<? super T>) original.getClass().getMethod("clone").invoke(original);
-                } catch (Exception e) {
-                    System.err.println("Warning: Predicate is Cloneable but clone() method failed. Using shallow copy.");
-                }
-            }
-            return original;
         }
     }
 
