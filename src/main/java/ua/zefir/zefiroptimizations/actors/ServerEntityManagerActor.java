@@ -9,18 +9,21 @@ import com.google.common.collect.Lists;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.boss.dragon.EnderDragonEntity;
 import net.minecraft.entity.boss.dragon.EnderDragonPart;
-import net.minecraft.predicate.entity.EntityPredicates;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.util.function.LazyIterationConsumer;
+import net.minecraft.util.math.ChunkSectionPos;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
-import ua.zefir.zefiroptimizations.data.DummyPredicate;
 import ua.zefir.zefiroptimizations.mixin.ServerEntityManagerAccessor;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.function.Predicate;
+import java.util.concurrent.*;
 
 public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManagerMessages.ServerEntityManagerMessage> {
     private final ServerEntityManager<Entity> entityManager;
+
+    private final long timeout = 1000;
+    private final TimeUnit timeUnit = TimeUnit.MILLISECONDS;
 
     public static Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> create(ServerEntityManager<Entity> entityManager) {
         return Behaviors.setup(context -> new ServerEntityManagerActor(context, entityManager));
@@ -75,7 +78,47 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
                 .onMessage(ServerEntityManagerMessages.HandlerDestroy.class, this::handlerDestroy)
                 .onMessage(ServerEntityManagerMessages.HandlerUpdateLoadStatus.class, this::handlerUpdateLoadStatus)
 
+                .onMessage(ServerEntityManagerMessages.ListenerInternalRemove.class, this::handleListenerInternalRemove)
+                .onMessage(ServerEntityManagerMessages.ListenerInternalAdd.class, this::handleListenerInternalAdd)
+
                 .build();
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> handleListenerInternalRemove(ServerEntityManagerMessages.ListenerInternalRemove msg) {
+        Entity entity = (Entity) msg.entity();
+        long sectionPos = msg.sectionPos();
+
+        // Access the cache directly via accessor
+        var cache = ((ServerEntityManagerAccessor)this.entityManager).getCache();
+        var section = cache.findTrackingSection(sectionPos);
+
+        if (section != null) {
+            // 1. Remove the entity
+            if (!section.remove(entity)) {
+                getContext().getLog().warn("Entity {} wasn't found in section {} (destroying due to {})", entity, ChunkSectionPos.from(sectionPos), msg.reason());
+            }
+
+            // 2. Cleanup section if empty (Logic from entityLeftSection)
+            if (section.isEmpty()) {
+                cache.removeSection(sectionPos);
+            }
+        }
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> handleListenerInternalAdd(ServerEntityManagerMessages.ListenerInternalAdd msg) {
+        Entity entity = (Entity) msg.entity();
+
+        // We must recalculate the position here because the redirect only gives us the entity
+        long newSectionPos = ChunkSectionPos.toLong(entity.getBlockPos());
+
+        var cache = ((ServerEntityManagerAccessor)this.entityManager).getCache();
+
+        // getTrackingSection creates it if it doesn't exist
+        var section = cache.getTrackingSection(newSectionPos);
+
+        section.add(entity);
+        return this;
     }
 
     private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> handlerUpdateLoadStatus(ServerEntityManagerMessages.HandlerUpdateLoadStatus msg) {
@@ -125,130 +168,166 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
     }
 
     // I need to find a better approach than just copying original code
-    private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeServerWorld(ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld msg) {
-        List<? super T> result = Lists.newArrayList();
+    private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeServerWorld(
+            ServerEntityManagerMessages.RequestEntitiesByTypeServerWorld msg) {
 
-        this.entityManager.getLookup().forEach(msg.filter(), entity -> {
-            if (msg.predicate().test(entity)) {
-                result.add((T) entity);
-                if (result.size() >= msg.limit()) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        Callable<List<? super T>> entityLookupTask = () -> {
+            final List<? super T> result = Collections.synchronizedList(Lists.newArrayList());
+
+            this.entityManager.getLookup().forEach(msg.filter(), entity -> {
+                if (Thread.currentThread().isInterrupted()) {
                     return LazyIterationConsumer.NextIteration.ABORT;
                 }
-            }
 
-            return LazyIterationConsumer.NextIteration.CONTINUE;
-        });
-        msg.replyTo().tell(result);
-        return this;
-    }
-
-    private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeWorld(ServerEntityManagerMessages.RequestEntitiesByTypeWorld msg) {
-        List<? super T> result = Lists.newArrayList();
-        this.entityManager.getLookup().forEachIntersects(msg.filter(), msg.box(), entity -> {
-            if (msg.predicate().test(entity)) {
-                result.add((T) entity);
-                if (result.size() >= msg.limit()) {
-                    return LazyIterationConsumer.NextIteration.ABORT;
-                }
-            }
-
-            if (entity instanceof EnderDragonEntity enderDragonEntity) {
-                for (EnderDragonPart enderDragonPart : enderDragonEntity.getBodyParts()) {
-                    T entity2 = (T) msg.filter().downcast(enderDragonPart);
-                    if (entity2 != null && msg.predicate().test(entity2)) {
-                        result.add(entity2);
-                        if (result.size() >= msg.limit()) {
-                            return LazyIterationConsumer.NextIteration.ABORT;
-                        }
+                if (msg.predicate().test(entity)) {
+                    result.add((T) entity);
+                    if (result.size() >= msg.limit()) {
+                        return LazyIterationConsumer.NextIteration.ABORT;
                     }
                 }
-            }
+                return LazyIterationConsumer.NextIteration.CONTINUE;
+            });
+            return result;
+        };
 
-            return LazyIterationConsumer.NextIteration.CONTINUE;
-        });
-        msg.replyTo().tell(result);
+        Future<List<? super T>> future = executor.submit(entityLookupTask);
+
+        try {
+            List<? super T> result = future.get(timeout, timeUnit);
+            msg.replyTo().tell(result);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new RuntimeException("Entity lookup operation timed out after " + timeout + " " + timeUnit.toString(), e);
+        } catch (InterruptedException | ExecutionException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Error during entity lookup", e);
+        } finally {
+            executor.shutdown();
+        }
+
         return this;
     }
 
-    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestOtherEntities(ServerEntityManagerMessages.RequestOtherEntities msg) {
-        // 1. Log entry
-        getContext().getLog().info("requestOtherEntities: Received request for box {}, except {}, predicate {}", msg.box(), msg.except(), msg.predicate().getClass().getName());
-//        getContext().getLog().info(msg.predicate().getClass().getSimpleName());
-//        Predicate<Entity> predicate = msg.except() == null ? EntityPredicates.CAN_COLLIDE : EntityPredicates.EXCEPT_SPECTATOR.and(msg.except()::collidesWith);
+    private <T extends Entity> Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestEntitiesByTypeWorld(
+            ServerEntityManagerMessages.RequestEntitiesByTypeWorld msg) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
 
-        List<Entity> list = Lists.<Entity>newArrayList();
-//        getContext().getLog().info("msg.predicate() instanceof DummyPredicate {}", msg.predicate() instanceof DummyPredicate);
-        try {
-            this.entityManager.getLookup().forEachIntersects(msg.box(), entity -> {
-                // 2. Log each entity being considered
-                // Be careful: this can be VERY verbose if many entities are in the box
-//                getContext().getLog().info("requestOtherEntities: Checking entity {}", entity);
+        Callable<List<? super T>> entityLookupTask = () -> {
+            final List<? super T> result = Collections.synchronizedList(Lists.newArrayList());
 
-                boolean shouldAdd = false;
-                if (entity != msg.except()) {
-                    // 3. Log before predicate test
-//                    getContext().getLog().info("requestOtherEntities: Testing predicate for entity {}", entity);
-//                    if(msg.predicate() instanceof DummyPredicate){
-//                        throw new RuntimeException("DummyPredicate " + entity);
-//                    }
-                    boolean predicateResult = msg.predicate().test(entity);
-                    // 4. Log after predicate test
-//                    getContext().getLog().info("requestOtherEntities: Predicate for entity {} returned {}", entity, predicateResult);
-                    if (predicateResult) {
-                        list.add(entity);
-                        // 5. Log when entity added
-//                        getContext().getLog().info("requestOtherEntities: Added entity {} to list", entity);
-                        shouldAdd = true; // Keep track if added
+            this.entityManager.getLookup().forEachIntersects(msg.filter(), msg.box(), entity -> {
+                if (Thread.currentThread().isInterrupted()) {
+                    return LazyIterationConsumer.NextIteration.ABORT;
+                }
+
+                if (msg.predicate().test(entity)) {
+                    result.add((T) entity);
+                    if (result.size() >= msg.limit()) {
+                        return LazyIterationConsumer.NextIteration.ABORT;
                     }
                 }
 
                 if (entity instanceof EnderDragonEntity enderDragonEntity) {
-                    // 6. Log EnderDragon found
-//                    getContext().getLog().info("requestOtherEntities: Found EnderDragonEntity: {}", enderDragonEntity);
                     for (EnderDragonPart enderDragonPart : enderDragonEntity.getBodyParts()) {
-                        // 7. Log each part
+                        T entity2 = (T) msg.filter().downcast(enderDragonPart);
+                        if (entity2 != null && msg.predicate().test(entity2)) {
+                            result.add(entity2);
+                            if (result.size() >= msg.limit()) {
+                                return LazyIterationConsumer.NextIteration.ABORT;
+                            }
+                        }
+                    }
+                }
+
+                return LazyIterationConsumer.NextIteration.CONTINUE;
+            });
+            return result;
+        };
+
+        Future<List<? super T>> future = executor.submit(entityLookupTask);
+
+        try {
+            List<? super T> result = future.get(timeout, timeUnit);
+            msg.replyTo().tell(result);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new RuntimeException("Entity lookup operation timed out after " + 1000 + " " + TimeUnit.MILLISECONDS.toString(), e);
+        } catch (InterruptedException | ExecutionException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Error during entity lookup", e);
+        } finally {
+            executor.shutdown();
+        }
+
+        return this;
+    }
+
+    private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestOtherEntities(
+            ServerEntityManagerMessages.RequestOtherEntities msg) {
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        Callable<List<Entity>> entityLookupTask = () -> {
+            final List<Entity> list = Collections.synchronizedList(Lists.newArrayList());
+
+            this.entityManager.getLookup().forEachIntersects(msg.box(), entity -> {
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+
+                boolean shouldAdd = false;
+                if (entity != msg.except()) {
+                    if (msg.predicate().test(entity)) {
+                        list.add(entity);
+                        shouldAdd = true;
+                    }
+                }
+
+                if (entity instanceof EnderDragonEntity enderDragonEntity) {
+                    for (EnderDragonPart enderDragonPart : enderDragonEntity.getBodyParts()) {
                         getContext().getLog().info("requestOtherEntities: Checking EnderDragonPart {}", enderDragonPart);
 
-                        // CRITICAL BUG HERE: You are checking `entity != msg.except()`
-                        // instead of `enderDragonPart != msg.except()` for the parts.
-                        // If the main dragon entity is the one to be excepted, NO parts will be added.
-                        // This might not be the deadlock, but it's a significant functional bug.
-                        // Corrected logic:
-                        if (enderDragonPart != msg.except()) { // Check the part, not the main dragon
-                            // 8. Log before predicate test for part
-                            // getContext().getLog().debug("requestOtherEntities: Testing predicate for part {}", enderDragonPart);
+                        if (enderDragonPart != msg.except()) {
                             boolean partPredicateResult = msg.predicate().test(enderDragonPart);
-                            // 9. Log after predicate test for part
                             getContext().getLog().info("requestOtherEntities: Predicate for part {} returned {}", enderDragonPart, partPredicateResult);
                             if (partPredicateResult) {
                                 list.add(enderDragonPart);
-                                // 10. Log when part added
                                 getContext().getLog().info("requestOtherEntities: Added EnderDragonPart {} to list", enderDragonPart);
                             }
-                        } else if (shouldAdd) { // If the main dragon was added, and this part IS the 'except', log it.
+                        } else if (shouldAdd) {
                             getContext().getLog().warn("requestOtherEntities: EnderDragonPart {} was skipped because it's the 'except' entity, but main dragon was added.", enderDragonPart);
                         }
                     }
                 }
             });
+            return list;
+        };
 
-            // 11. Log before replying
-//            getContext().getLog().info("requestOtherEntities: Replying with list size: {}", list.size());
-            msg.replyTo().tell(list);
-            return this;
+        Future<List<Entity>> future = executor.submit(entityLookupTask);
 
-        } catch (Throwable t) { // Catch EVERYTHING
-            // 12. CRITICAL: Log any exception
-            getContext().getLog().error("requestOtherEntities: CRITICAL ERROR during processing. Replying with empty list.", t);
-            // Ensure the asker gets a reply, even if it's an error or empty.
-            // Otherwise, the asker (main thread) will block forever on .get()
-            msg.replyTo().tell(Lists.newArrayList()); // Or a specific error message type
-            // Depending on the severity, you might want to stop the actor or return Behaviors.stopped()
-            // For now, just returning 'this' will allow it to process next message, but it might be in a bad state.
-            // If the error is unrecoverable, consider:
-            // return Behaviors.stopped(() -> getContext().getLog().error("Actor stopped due to unrecoverable error in requestOtherEntities"));
-            return this;
+        try {
+            List<Entity> result = future.get(timeout, timeUnit);
+            msg.replyTo().tell(result);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            getContext().getLog().error("requestOtherEntities: CRITICAL ERROR - Operation timed out.", e);
+            msg.replyTo().tell(Lists.newArrayList());
+            throw new RuntimeException("Entity lookup operation timed out after " + timeout + " " + timeUnit.toString(), e);
+        } catch (InterruptedException | ExecutionException e) {
+            future.cancel(true);
+            getContext().getLog().error("requestOtherEntities: CRITICAL ERROR during processing. Replying with empty list.", e);
+            msg.replyTo().tell(Lists.newArrayList());
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Error during entity lookup", e);
+        } finally {
+            executor.shutdown();
         }
+
+        return this;
     }
 
 
@@ -277,10 +356,8 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
     }
 
     public Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> requestIsLoaded(ServerEntityManagerMessages.RequestIsLoaded msg) {
-//        System.out.println("Starting request isLoaded");
         boolean result = this.entityManager.isLoaded(msg.chunkPos());
         msg.replyTo().tell(result);
-//        System.out.println("Finished request isLoaded");
         return this;
     }
 

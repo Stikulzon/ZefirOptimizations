@@ -34,9 +34,10 @@ public class ZefirOptimizations implements ModInitializer {
 
 		ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
 		ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
+		ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
 	}
 
-	public static void shutdown() {
+	public void onServerStopping(MinecraftServer minecraftServer) {
 		if (actorSystem != null) {
 			actorSystem.terminate();
 		}

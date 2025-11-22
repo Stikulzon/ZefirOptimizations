@@ -20,10 +20,11 @@ import ua.zefir.zefiroptimizations.data.ServerEntityManagerRef;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.ActorSystemManagerMessage> {
 
-    private final Map<Entity, ActorRef<ZefirsActorMessages.EntityMessage>> entityActors = new HashMap<>();
+    private final Map<Entity, ActorRef<ZefirsActorMessages.EntityMessage>> entityActors = new ConcurrentHashMap<>();
     private final Map<RegistryKey<World>, ActorRef<ServerEntityManagerMessages.ServerEntityManagerMessage>> entityManagerActors = new HashMap<>();
 
     public static Behavior<ZefirsActorMessages.ActorSystemManagerMessage> create() {
@@ -41,6 +42,7 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
                 .onMessage(ZefirsActorMessages.EntityCreated.class, this::handleEntityCreated)
                 .onMessage(ZefirsActorMessages.EntityRemoved.class, this::handleEntityRemoved)
                 .onMessage(ZefirsActorMessages.TickSingleEntity.class, this::handleAsyncSingleTick)
+                .onMessage(ZefirsActorMessages.TickSingleEntity.class, this::handleTickRidingSingleEntity)
                 .onMessage(ZefirsActorMessages.TickPlayer.class, this::handleTickPlayer)
                 .onMessage(ZefirsActorMessages.ServerEntityManagerCreated.class, this::handleEntityManagerCreated)
                 .onMessage(ZefirsActorMessages.RequestEntityManagerActorRef.class, this::requestEntityManagerActorRef)
@@ -61,13 +63,15 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
         for (LivingEntity entity : world.getEntitiesByType(
                 TypeFilter.instanceOf(LivingEntity.class),
                 e -> e instanceof LivingEntity)) {
+            if(!entity.isRemoved()){
+                ActorRef<ZefirsActorMessages.EntityMessage> entityActor = entityActors.get(entity);
 
-            ActorRef<ZefirsActorMessages.EntityMessage> entityActor = entityActors.get(entity);
-
-            if (entityActor != null) {
-                entityActor.tell(msg);
-            } else {
-                System.out.println("entityActor are null for entity " + entity);
+                if (entityActor != null) {
+                    entityActor.tell(msg);
+                } else {
+//                    System.out.println("entityActor are null for entity " + entity);
+                    spawnEntityActor(entity);
+                }
             }
         }
 //        System.out.println("Tick!");
@@ -77,21 +81,41 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
     private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> handleAsyncSingleTick(ZefirsActorMessages.TickSingleEntity msg) {
         ActorRef<ZefirsActorMessages.EntityMessage> entityActor = entityActors.get(msg.entity());
 //        Optional<ActorRef<Void>> entityActor = this.getContext().getChild("entityActor_" + msg.entity().getUuid());
+        if(!msg.entity().isRemoved()) {
+            if (entityActor != null) {
+                entityActor.tell(new ZefirsActorMessages.Tick());
+            } else {
+//                System.out.println("entityActor are null for entity " + msg.entity());
+                spawnEntityActor(msg.entity());
+            }
+        }
+        return this;
+    }
 
-        if (entityActor != null) {
-            entityActor.tell(new ZefirsActorMessages.Tick());
-        } else {
-            System.out.println("entityActor are null for entity " + msg.entity());
+
+    private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> handleTickRidingSingleEntity(ZefirsActorMessages.TickSingleEntity msg) {
+        ActorRef<ZefirsActorMessages.EntityMessage> entityActor = entityActors.get(msg.entity());
+//        Optional<ActorRef<Void>> entityActor = this.getContext().getChild("entityActor_" + msg.entity().getUuid());
+        if(!msg.entity().isRemoved()) {
+            if (entityActor != null) {
+                entityActor.tell(new ZefirsActorMessages.TickRiding());
+            } else {
+//                System.out.println("entityActor are null for entity " + msg.entity());
+                spawnEntityActor(msg.entity());
+            }
         }
         return this;
     }
 
     private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> handleTickPlayer(ZefirsActorMessages.TickPlayer msg) {
         ActorRef<ZefirsActorMessages.EntityMessage> entityActor = entityActors.get(msg.entity());
-        if (entityActor != null) {
-            entityActor.tell(new ZefirsActorMessages.TickPlayerActor());
-        } else {
-            System.out.println("entityActor are null for entity " + msg.entity());
+        if(!msg.entity().isRemoved()) {
+            if (entityActor != null) {
+                entityActor.tell(new ZefirsActorMessages.TickPlayerActor());
+            } else {
+//                System.out.println("entityActor are null for entity " + msg.entity());
+                spawnEntityActor(msg.entity());
+            }
         }
         return this;
     }
@@ -112,13 +136,17 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
     private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> handleEntityCreated(ZefirsActorMessages.EntityCreated msg) {
         Entity entity = msg.entity();
 
+        spawnEntityActor(entity);
+        return this;
+    }
+
+    private void spawnEntityActor(Entity entity) {
         String actorName = "entityActor_" + entity.getUuid();
         if (getContext().getChild(actorName).isEmpty()) {
             ActorRef<ZefirsActorMessages.EntityMessage> entityActor = getContext().spawn(Behaviors.supervise(EntityActor.create(entity)).onFailure(SupervisorStrategy.restart()), actorName);
             getContext().watch(entityActor);
             entityActors.put(entity, entityActor);
         }
-        return this;
     }
 
     private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> handleEntityRemoved(ZefirsActorMessages.EntityRemoved msg) {
@@ -131,7 +159,7 @@ public class ActorSystemManager extends AbstractBehavior<ZefirsActorMessages.Act
     }
 
     private Behavior<ZefirsActorMessages.ActorSystemManagerMessage> onTerminated(Terminated signal) {
-        getContext().getLog().info("Child actor {} has terminated.", signal.getRef().path().name());
+//        getContext().getLog().info("Child actor {} has terminated.", signal.getRef().path().name());
         return this;
     }
 

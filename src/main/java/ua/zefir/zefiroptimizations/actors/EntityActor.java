@@ -15,7 +15,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class EntityActor extends AbstractBehavior<ZefirsActorMessages.EntityMessage> {
     protected final Entity entity;
-    protected final ThreadLocalRandom random = ThreadLocalRandom.current();
 
     public static Behavior<ZefirsActorMessages.EntityMessage> create(Entity entity) {
         return Behaviors.setup(context -> new EntityActor(context, entity));
@@ -30,6 +29,7 @@ public class EntityActor extends AbstractBehavior<ZefirsActorMessages.EntityMess
     public Receive<ZefirsActorMessages.EntityMessage> createReceive() {
         return newReceiveBuilder()
                 .onMessage(ZefirsActorMessages.Tick.class, this::handleAsyncTick)
+                .onMessage(ZefirsActorMessages.TickRiding.class, this::handleTickRiding)
                 .onMessage(ZefirsActorMessages.TickPlayerActor.class, this::handleTickPlayerActor)
                 .onMessage(ZefirsActorMessages.RequestIsRemoved.class, this::onRequestIsRemoved)
                 .build();
@@ -42,6 +42,13 @@ public class EntityActor extends AbstractBehavior<ZefirsActorMessages.EntityMess
         return this;
     }
 
+    private Behavior<ZefirsActorMessages.EntityMessage> handleTickRiding(ZefirsActorMessages.TickRiding msg) {
+        if (!entity.isRemoved()) {
+            entity.tickRiding();
+        }
+        return this;
+    }
+
     private Behavior<ZefirsActorMessages.EntityMessage> handleTickPlayerActor(ZefirsActorMessages.TickPlayerActor msg) {
         if (!entity.isRemoved() && entity instanceof PlayerEntity player) {
             ((ServerPlayerEntityMixinInterface) player).zefirOptimizations$callSuperTick();
@@ -50,7 +57,6 @@ public class EntityActor extends AbstractBehavior<ZefirsActorMessages.EntityMess
     }
 
     private Behavior<ZefirsActorMessages.EntityMessage> onRequestIsRemoved(ZefirsActorMessages.RequestIsRemoved msg) {
-
         getContext().getSelf().tell(new ZefirsActorMessages.RequestIsRemoved(this.entity.isRemoved())); // This example is for understanding, but it is redundant.
         return this;
     }

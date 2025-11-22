@@ -13,16 +13,18 @@ import net.minecraft.world.entity.EntityLike;
 
 public final class ZefirsActorMessages {
 
-    public sealed interface ActorSystemManagerMessage permits EntityCreated, EntityRemoved, RequestEntityManagerActorRef, ResponseEntityManagerActorRef, ServerEntityManagerCreated, Tick, TickPlayer, TickSingleEntity {}
-    public sealed interface EntityMessage permits Tick, TickPlayerActor, ContinueTickMovement, ApplyDamage, LootItemEntity, RequestIsRemoved{}
+    public sealed interface ActorSystemManagerMessage permits TickRiding, TickRidingSingleEntity, EntityCreated, EntityRemoved, RequestEntityManagerActorRef, ResponseEntityManagerActorRef, ServerEntityManagerCreated, Tick, TickPlayer, TickSingleEntity {}
+    public sealed interface EntityMessage permits TickRiding, Tick, TickPlayerActor, ContinueTickMovement, ApplyDamage, LootItemEntity, RequestIsRemoved{}
     public sealed interface MainThreadMessage permits ApplyDamage, LootItemEntity{}
 
     public record ServerEntityManagerCreated<T extends EntityLike>(ServerEntityManager<T> entityManager, RegistryKey<World> worldRegistryKey, ActorRef<ResponseEntityManagerActorRef> replyTo) implements ActorSystemManagerMessage {}
 
     public record Tick() implements ActorSystemManagerMessage, EntityMessage {}
+    public record TickRiding() implements ActorSystemManagerMessage, EntityMessage {}
     public record TickPlayerActor() implements EntityMessage {}
 
     public record TickSingleEntity(Entity entity) implements ActorSystemManagerMessage {}
+    public record TickRidingSingleEntity(Entity entity) implements ActorSystemManagerMessage {}
     public record TickPlayer(Entity entity) implements ActorSystemManagerMessage {}
     public record ContinueTickMovement() implements EntityMessage{}
 

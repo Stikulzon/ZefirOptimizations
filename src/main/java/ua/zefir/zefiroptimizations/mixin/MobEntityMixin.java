@@ -18,22 +18,12 @@ public abstract class MobEntityMixin extends LivingEntityMixin {
         super(type, world);
     }
 
-//    @Inject(method = "<init>", at = @At("RETURN"))
-//    private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
-//        LivingEntity self = (LivingEntity) (Object) this;
-//        if (!world.isClient) {
-//            ZefirOptimizations.getActorSystem()
-//                    .tell(new ZefirsActorMessages.EntityCreated(self));
-//        }
-//    }
-
     @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;tick()V", shift = At.Shift.AFTER), cancellable = true)
     private void onTick(CallbackInfo ci) {
         if(Thread.currentThread() == ZefirOptimizations.SERVER.getThread()) {
             ci.cancel();
         }
     }
-
 
     @Inject(method = "loot", at = @At("HEAD"), cancellable = true)
     private void onLoot(ItemEntity item, CallbackInfo ci) {
@@ -45,15 +35,4 @@ public abstract class MobEntityMixin extends LivingEntityMixin {
         }
     }
 
-
-//    @Inject(method = "tickNewAi", at = @At("HEAD"))
-//    private void onTickNewAi(CallbackInfo ci) {
-//        if(Thread.currentThread() != ZefirOptimizations.SERVER.getThread()){
-//            System.out.println("Ticking new ai on thread: " + Thread.currentThread().getName());
-//            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-//            for (StackTraceElement element : stackTrace) {
-//                System.out.println(element);
-//            }
-//        }
-//    }
 }

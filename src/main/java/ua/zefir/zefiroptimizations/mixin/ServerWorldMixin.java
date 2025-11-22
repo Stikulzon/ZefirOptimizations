@@ -26,11 +26,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
 import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
-import ua.zefir.zefiroptimizations.data.CheckedServerEntityManager;
 import ua.zefir.zefiroptimizations.data.DummyEntityLookup;
 import ua.zefir.zefiroptimizations.data.DummyServerEntityManager;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -62,13 +60,18 @@ public class ServerWorldMixin  {
     }
 
     @Inject(method = "getEntityLookup", at = @At("HEAD"), cancellable = true)
-    private void onTick(CallbackInfoReturnable<EntityLookup<Entity>> cir) {
+    private void onGetEntityLookup(CallbackInfoReturnable<EntityLookup<Entity>> cir) {
         cir.setReturnValue(this.dummyEntityLookup);
     }
 
     @Redirect(method = "tickEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;tick()V"))
-    private void onTickEntity(Entity instance) {
+    private void redirectTickEntity(Entity instance) {
         ZefirOptimizations.getActorSystem().tell(new ZefirsActorMessages.TickSingleEntity(instance));
+    }
+
+    @Redirect(method = "tickPassenger", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;tickRiding()V"))
+    private void redirectTickRiding(Entity instance) {
+        ZefirOptimizations.getActorSystem().tell(new ZefirsActorMessages.TickRidingSingleEntity(instance));
     }
 
     @Inject(method = "collectEntitiesByType(Lnet/minecraft/util/TypeFilter;Ljava/util/function/Predicate;Ljava/util/List;I)V", at = @At("HEAD"), cancellable = true)

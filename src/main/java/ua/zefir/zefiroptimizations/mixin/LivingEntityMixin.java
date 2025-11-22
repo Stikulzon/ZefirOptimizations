@@ -76,20 +76,15 @@ public abstract class LivingEntityMixin extends Entity {
         }
     }
 
-//    @Inject(method = "isClimbing", at = @At("HEAD"), cancellable = true)
-//    private void onIsClimbing(CallbackInfoReturnable<Boolean> cir) {
-////        System.out.println("isClimbing");
-//        cir.setReturnValue(false);
-//    }
-
+    // TODO: Fox this
     @Overwrite
     public boolean isClimbing() {
         if (this.isSpectator()) {
             return false;
         } else {
-            BlockPos blockPos = this.getBlockPos();
+//            BlockPos blockPos = this.getBlockPos();
 //            this.getWorld().getBlockState(this.getBlockPos());
-            WorldChunk worldChunk = this.getWorld().getChunk(ChunkSectionPos.getSectionCoord(blockPos.getX()), ChunkSectionPos.getSectionCoord(blockPos.getZ()));
+//            WorldChunk worldChunk = this.getWorld().getChunk(ChunkSectionPos.getSectionCoord(blockPos.getX()), ChunkSectionPos.getSectionCoord(blockPos.getZ()));
             return false;
         }
     }

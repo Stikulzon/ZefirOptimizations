@@ -18,7 +18,7 @@ import ua.zefir.zefiroptimizations.actors.messages.ZefirsActorMessages;
 @Mixin(Entity.class)
 public abstract class EntityMixin {
 
-    @Inject(method = "<init>(Lnet/minecraft/entity/EntityType;Lnet/minecraft/world/World;)V", at = @At("RETURN"))
+    @Inject(method = "<init>(Lnet/minecraft/entity/EntityType;Lnet/minecraft/world/World;)V", at = @At("TAIL"))
     private void init(EntityType<? extends LivingEntity> entityType, World world, CallbackInfo ci) {
         Entity self = (Entity) (Object) this;
         if (!world.isClient) {
@@ -29,7 +29,6 @@ public abstract class EntityMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
-//        Entity self = (Entity) (Object) this;
         if (Thread.currentThread() == ZefirOptimizations.SERVER.getThread()) {
             throw new RuntimeException("Entity ticking on main thread!");
         }

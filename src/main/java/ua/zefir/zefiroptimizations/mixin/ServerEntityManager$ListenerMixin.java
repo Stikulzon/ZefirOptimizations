@@ -1,6 +1,7 @@
 package ua.zefir.zefiroptimizations.mixin;
 
 import akka.actor.typed.javadsl.AskPattern;
+import net.minecraft.entity.Entity;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.world.entity.EntityHandler;
 import net.minecraft.world.entity.EntityLike;
@@ -15,7 +16,6 @@ import ua.zefir.zefiroptimizations.ZefirOptimizations;
 import ua.zefir.zefiroptimizations.actors.messages.ServerEntityManagerMessages;
 import ua.zefir.zefiroptimizations.data.ServerEntityManagerRef;
 
-import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -23,13 +23,8 @@ import java.util.concurrent.ExecutionException;
 
 @Mixin(targets = "net.minecraft.server.world.ServerEntityManager$Listener")
 public class ServerEntityManager$ListenerMixin<T extends EntityLike> {
-    @Shadow @Final ServerEntityManager manager;
-
-    @Redirect(method = "updateEntityPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerEntityManager;entityLeftSection(JLnet/minecraft/world/entity/EntityTrackingSection;)V"))
-    private void redirectEntityLeftSection(ServerEntityManager instance, long sectionPos, EntityTrackingSection<T> section) {
-        ((ServerEntityManagerRef) manager).getEntityManagerActor()
-                .tell(new ServerEntityManagerMessages.EntityLeftSection<>(sectionPos, section));
-    }
+    @Shadow @Final ServerEntityManager<T> manager;
+    @Shadow private long sectionPos;
 
     @Redirect(method = "updateLoadStatus", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/EntityHandler;updateLoadStatus(Ljava/lang/Object;)V", ordinal = 0))
     private <P> void redirectHandlerUpdateLoadStatus(EntityHandler instance, P t) {
@@ -92,12 +87,6 @@ public class ServerEntityManager$ListenerMixin<T extends EntityLike> {
         return false;
     }
 
-    @Redirect(method = "remove", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerEntityManager;entityLeftSection(JLnet/minecraft/world/entity/EntityTrackingSection;)V"))
-    private void redirectEntityLeftSection$remove(ServerEntityManager instance, long sectionPos, EntityTrackingSection<T> section) {
-        ((ServerEntityManagerRef) manager).getEntityManagerActor()
-                .tell(new ServerEntityManagerMessages.EntityLeftSection<>(sectionPos, section));
-    }
-
     @Redirect(method = "updateEntityPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/SectionedEntityCache;getTrackingSection(J)Lnet/minecraft/world/entity/EntityTrackingSection;"))
     private EntityTrackingSection<T> redirectGetTrackingSection(SectionedEntityCache instance, long sectionPos) {
         CompletionStage<EntityTrackingSection<T>> resultFuture =
@@ -111,5 +100,34 @@ public class ServerEntityManager$ListenerMixin<T extends EntityLike> {
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException("Error getting the result from ServerEntityManager actor", e);
         }
+    }
+
+    @Redirect(method = "updateEntityPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/EntityTrackingSection;remove(Lnet/minecraft/world/entity/EntityLike;)Z"))
+    private boolean redirectRemoveInUpdatePosition(EntityTrackingSection instance, T entity) {
+        ((ServerEntityManagerRef) manager).getEntityManagerActor()
+                .tell(new ServerEntityManagerMessages.ListenerInternalRemove<>((T) entity, this.sectionPos, null));
+        return true;
+    }
+    @Redirect(method = "updateEntityPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/EntityTrackingSection;add(Lnet/minecraft/world/entity/EntityLike;)V"))
+    private void redirectAddInUpdatePosition(EntityTrackingSection instance, T entity) {
+        ((ServerEntityManagerRef) manager).getEntityManagerActor()
+                .tell(new ServerEntityManagerMessages.ListenerInternalAdd<>((T) entity));
+    }
+
+    @Redirect(method = "updateEntityPosition", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerEntityManager;entityLeftSection(JLnet/minecraft/world/entity/EntityTrackingSection;)V"))
+    private void redirectEntityLeftSectionInUpdatePosition(ServerEntityManager instance, long sectionPos, EntityTrackingSection<T> section) {
+        // No-Op: Actor handles this logic
+    }
+
+    @Redirect(method = "remove", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/EntityTrackingSection;remove(Lnet/minecraft/world/entity/EntityLike;)Z"))
+    private boolean redirectRemoveInRemove(EntityTrackingSection instance, T entity) {
+        ((ServerEntityManagerRef) manager).getEntityManagerActor()
+                .tell(new ServerEntityManagerMessages.ListenerInternalRemove<>(entity, this.sectionPos, Entity.RemovalReason.DISCARDED));
+        return true;
+    }
+
+    @Redirect(method = "remove", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerEntityManager;entityLeftSection(JLnet/minecraft/world/entity/EntityTrackingSection;)V"))
+    private void redirectEntityLeftSectionInRemove(ServerEntityManager instance, long sectionPos, EntityTrackingSection<T> section) {
+        // No-Op: Actor handles this logic
     }
 }

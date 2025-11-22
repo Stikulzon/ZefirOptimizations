@@ -76,11 +76,6 @@ public class WorldMixin {
             }
     }
 
-//    @Inject(method = "getOtherEntities", at = @At("TAIL"))
-//    private void onGetOtherEntitiesCheck(@Nullable Entity except, Box box, Predicate<? super Entity> predicate, CallbackInfoReturnable<List<Entity>> cir) {
-//        System.out.println("This should never happen");
-//    }
-
     @Inject(method = "collectEntitiesByType(Lnet/minecraft/util/TypeFilter;Lnet/minecraft/util/math/Box;Ljava/util/function/Predicate;Ljava/util/List;I)V", at = @At("HEAD"), cancellable = true)
     private <T extends Entity> void onCollectEntitiesByType(TypeFilter<Entity, T> filter, Box box, Predicate<? super T> predicate, List<? super T> result, int limit, CallbackInfo ci) {
         World self = (World) (Object) this;
@@ -123,6 +118,5 @@ public class WorldMixin {
     private Random redirectWorldRandomInit() {
         return new CheckedThreadLocalRandom(RandomSeed.getSeed(), () -> this.thread);
     }
-
 
 }

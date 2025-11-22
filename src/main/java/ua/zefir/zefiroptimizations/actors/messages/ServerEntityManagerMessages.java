@@ -22,7 +22,7 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 public final class ServerEntityManagerMessages {
-    public sealed interface ServerEntityManagerMessage permits AddEntities, RequestCacheTrackingSection, Close, Dump, EntityLeftSection, EntityLookupForEach, EntityLookupForEachIntersects, EntityLookupForEachIntersectsTypeFilter, EntityUuidsRemove, Flush, HandlerDestroy, HandlerUpdateLoadStatus, LoadEntities, RequestAddEntity, RequestDebugString, RequestEntitiesByTypeServerWorld, RequestEntitiesByTypeWorld, RequestEntityLookupById, RequestEntityLookupByUuid, RequestEntityLookupIterable, RequestHas, RequestIndexSize, RequestIsLoaded, RequestOtherEntities, RequestShouldTickBlockPos, RequestShouldTickChunkPos, Save, StartTicking, StartTracking, StopTicking, StopTracking, Tick, UpdateTrackingStatus, UpdateTrackingStatusChunkLevelType {}
+    public sealed interface ServerEntityManagerMessage permits AddEntities, Close, Dump, EntityLeftSection, EntityLookupForEach, EntityLookupForEachIntersects, EntityLookupForEachIntersectsTypeFilter, EntityUuidsRemove, Flush, HandlerDestroy, HandlerUpdateLoadStatus, ListenerInternalAdd, ListenerInternalRemove, LoadEntities, RequestAddEntity, RequestCacheTrackingSection, RequestDebugString, RequestEntitiesByTypeServerWorld, RequestEntitiesByTypeWorld, RequestEntityLookupById, RequestEntityLookupByUuid, RequestEntityLookupIterable, RequestHas, RequestIndexSize, RequestIsLoaded, RequestOtherEntities, RequestShouldTickBlockPos, RequestShouldTickChunkPos, Save, StartTicking, StartTracking, StopTicking, StopTracking, Tick, UpdateTrackingStatus, UpdateTrackingStatusChunkLevelType {}
     public sealed interface ServerEntityManagerMessageResponse permits ResponseDebugString, ResponseEntityLookupEntity, ResponseEntityLookupIterable, ResponseIndexSize {}
 
     public record Tick() implements ServerEntityManagerMessage {}
@@ -43,6 +43,9 @@ public final class ServerEntityManagerMessages {
     public record RequestShouldTickChunkPos(ChunkPos pos, ActorRef<Boolean> replyTo) implements ServerEntityManagerMessage {}
     public record RequestDebugString(ActorRef<ResponseDebugString> replyTo) implements ServerEntityManagerMessage {}
     public record RequestIndexSize(ActorRef<ResponseIndexSize> replyTo) implements ServerEntityManagerMessage {}
+
+    public record ListenerInternalRemove<T>(T entity, long sectionPos, Entity.RemovalReason reason) implements ServerEntityManagerMessage {}
+    public record ListenerInternalAdd<T>(T entity) implements ServerEntityManagerMessage {}
 
 //    public record ResponseAddEntity(boolean result) implements ServerEntityManagerMessageResponse {}
 //    public record ResponseHas(boolean result) implements ServerEntityManagerMessageResponse {}
