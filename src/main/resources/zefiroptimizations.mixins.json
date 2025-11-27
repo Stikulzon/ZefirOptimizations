@@ -9,6 +9,7 @@
     "ItemEntityMixin",
     "LivingEntityAccessor",
     "LivingEntityMixin",
+    "MinecraftServerMixin",
     "MobEntityAccessor",
     "MobEntityMixin",
     "ServerEntityManager$ListenerMixin",
@@ -16,7 +17,9 @@
     "ServerEntityManagerInterfaceMixin",
     "ServerEntityManagerMixin",
     "ServerPlayerEntityMixin",
+    "ServerWorldAccessor",
     "ServerWorldMixin",
+    "WorldAccessor",
     "WorldMixin"
   ],
   "injectors": {

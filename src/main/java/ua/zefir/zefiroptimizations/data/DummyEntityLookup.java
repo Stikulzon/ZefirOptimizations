@@ -86,21 +86,15 @@ public class DummyEntityLookup<T extends EntityLike> implements EntityLookup<T> 
     @Override
     public void forEachIntersects(Box box, Consumer action) {
         throw new RuntimeException("Unauthorized EntityLookup access. You need to request it from the ServerEntityManager actor.");
-//        entityManagerActor
-//                .tell(new ServerEntityManagerMessages.EntityLookupForEachIntersects(box, action));
     }
 
     @Override
     public void forEachIntersects(TypeFilter filter, Box box, LazyIterationConsumer consumer) {
         throw new RuntimeException("Unauthorized EntityLookup access. You need to request it from the ServerEntityManager actor.");
-//        entityManagerActor
-//                .tell(new ServerEntityManagerMessages.EntityLookupForEachIntersectsTypeFilter(filter, box, consumer));
     }
 
     @Override
     public void forEach(TypeFilter filter, LazyIterationConsumer consumer) {
         throw new RuntimeException("Unauthorized EntityLookup access. You need to request it from the ServerEntityManager actor.");
-//        entityManagerActor
-//                .tell(new ServerEntityManagerMessages.EntityLookupForEach(filter, consumer));
     }
 }

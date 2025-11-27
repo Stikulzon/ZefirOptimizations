@@ -109,12 +109,10 @@ public class ServerEntityManagerActor extends AbstractBehavior<ServerEntityManag
     private Behavior<ServerEntityManagerMessages.ServerEntityManagerMessage> handleListenerInternalAdd(ServerEntityManagerMessages.ListenerInternalAdd msg) {
         Entity entity = (Entity) msg.entity();
 
-        // We must recalculate the position here because the redirect only gives us the entity
         long newSectionPos = ChunkSectionPos.toLong(entity.getBlockPos());
 
         var cache = ((ServerEntityManagerAccessor)this.entityManager).getCache();
 
-        // getTrackingSection creates it if it doesn't exist
         var section = cache.getTrackingSection(newSectionPos);
 
         section.add(entity);
