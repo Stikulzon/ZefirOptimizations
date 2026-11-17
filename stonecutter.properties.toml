@@ -1,0 +1,19 @@
+mod.id = "zefiroptimizations"
+mod.version = "0.1.0-beta"
+mod.group = "ua.zefir.zefiroptimizations"
+
+deps.mixinsquared = "0.2.0"
+deps.admiral = "0.4.10"
+deps.junit = "6.1.0"
+
+["1.21.1"]
+deps.fabric_loader = "0.20.1"
+deps.fabric_api = "0.116.17+1.21.1"
+deps.lithium = "mc1.21.1-0.15.4-fabric"
+deps.c2me = "0.4.0-alpha.0.30+1.21.1"
+
+["26.2"]
+deps.fabric_loader = "0.19.3"
+deps.fabric_api = "0.156.0+26.2"
+deps.lithium = "mc26.2-0.25.3-fabric"
+deps.c2me = "0.4.2-alpha.0.60+26.2"

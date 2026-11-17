@@ -1,0 +1,17 @@
+#
+# https://help.github.com/articles/dealing-with-line-endings/
+#
+# Set default to LF for all text files
+* text=auto eol=lf
+
+# These are Windows script files and should use crlf
+*.bat           text eol=crlf
+
+gradlew text eol=lf
+*.jar binary
+*.png binary
+*.zip binary
+*.gz binary
+*.db binary
+*.dat binary
+**/src/main/generated/** linguist-generated=true
