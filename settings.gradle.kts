@@ -30,4 +30,4 @@ stonecutter {
     }
 }
 
-rootProject.name = "zefiroptimizations"
+rootProject.name = "zephyrium"

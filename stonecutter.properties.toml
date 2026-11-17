@@ -1,6 +1,6 @@
-mod.id = "zefiroptimizations"
+mod.id = "zephyrium"
 mod.version = "0.1.0-beta"
-mod.group = "ua.zefir.zefiroptimizations"
+mod.group = "ua.zefir.zephyrium"
 
 deps.mixinsquared = "0.2.0"
 deps.admiral = "0.4.10"

@@ -1,6 +1,6 @@
-# Zefir's Optimizations
+# Zephyrium - Parallel Entity Processing
 
-Zefir's Optimizations is a server-side Fabric mod for Minecraft 1.21.1 and 26.2 that ticks entities in parallel with mod compatibility in mind.
+Zephyrium is a server-side Fabric mod for Minecraft 1.21.1 and 26.2 that ticks entities in parallel with mod compatibility in mind.
 
 **You need at least 2 cores to see a difference. The more cores, the better.**
 
@@ -20,7 +20,7 @@ The mod follows the "let it die" philosophy: a process that crashes or hangs is 
 
 ## Configuration
 
-Configs are in `config/zefiroptimizations.json`.
+Configs are in `config/zephyrium.json`.
 Set `entityProcesses` to `false` to tick entities as vanilla does.
 
 ## Commands

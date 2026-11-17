@@ -1,33 +1,33 @@
 {
   "schemaVersion": 1,
-  "id": "zefiroptimizations",
+  "id": "zephyrium",
   "version": "${version}",
-  "name": "ZefirOptimizations",
+  "name": "Zephyrium",
   "description": "Ticks every server entity in its own Erlang-style process on a virtual thread, with bytecode-enforced ownership.",
   "authors": [
-    "Zefir"
+    "Zefir (Stikulzon)"
   ],
   "license": "ARR",
-  "icon": "assets/zefiroptimizations/icon.png",
+  "icon": "assets/zephyrium/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [
-      "ua.zefir.zefiroptimizations.ZefirOptimizations"
+      "ua.zefir.zephyrium.ZephyrModInit"
     ],
     "mixinsquared": [
-      "ua.zefir.zefiroptimizations.compatibility.c2me.C2meMixinCanceller"
+      "ua.zefir.zephyrium.compatibility.c2me.C2meMixinCanceller"
     ],
     "preLaunch": [
-      "ua.zefir.zefiroptimizations.ZefirPreLaunch"
+      "ua.zefir.zephyrium.ZephyrPreLaunch"
     ]
   },
   "mixins": [
-    "zefiroptimizations-process.mixins.json",
-    "zefiroptimizations-process-world.mixins.json",
-    "zefiroptimizations-process-neighbour.mixins.json",
-    "zefiroptimizations-process-push.mixins.json",
-    "zefiroptimizations-process-brain.mixins.json",
-    "zefiroptimizations-process-network.mixins.json"
+    "zephyrium-process.mixins.json",
+    "zephyrium-process-world.mixins.json",
+    "zephyrium-process-neighbour.mixins.json",
+    "zephyrium-process-push.mixins.json",
+    "zephyrium-process-brain.mixins.json",
+    "zephyrium-process-network.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
@@ -38,7 +38,7 @@
   "suggests": {
     "c2me-fabric": "*"
   },
-  "accessWidener": "zefiroptimizations.accesswidener",
+  "accessWidener": "zephyrium.accesswidener",
   "custom": {
     "lithium:options": {
       "mixin.chunk.entity_class_groups": false,

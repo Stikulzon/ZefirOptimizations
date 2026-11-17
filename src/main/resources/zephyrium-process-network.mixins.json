@@ -1,0 +1,10 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "ua.zefir.zephyrium.process.network.mixin",
+  "compatibilityLevel": "JAVA_${java_version}",
+  "mixins": [${mixins}],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

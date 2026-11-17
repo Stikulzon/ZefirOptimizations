@@ -31,7 +31,7 @@ java {
 }
 
 stonecutter {
-    files.disable(current.parsed >= "26.1", "ua/zefir/zefiroptimizations/process/mixin/ServerLevelInvoker.java")
+    files.disable(current.parsed >= "26.1", "ua/zefir/zephyrium/process/mixin/ServerLevelInvoker.java")
 }
 
 val compatMods: Configuration by configurations.creating {
@@ -65,12 +65,12 @@ dependencies {
 
 loom {
     accessWidenerPath = sc.process(
-        rootProject.file("src/main/resources/zefiroptimizations.accesswidener"),
-        "build/stonecutter/zefiroptimizations.accesswidener",
+        rootProject.file("src/main/resources/zephyrium.accesswidener"),
+        "build/stonecutter/zephyrium.accesswidener",
     )
 
     mods {
-        create("zefiroptimizations") {
+        create("zephyrium") {
             sourceSet(sourceSets.main.get())
         }
     }
