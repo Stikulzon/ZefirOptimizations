@@ -1,8 +1,6 @@
 # Zefir's Optimizations
 
-Zefir's Optimizations is a server-side Fabric mod for Minecraft 1.21.1 and 26.2 that ticks every entity in parallel with mod compatibility in mind.
-
-Works fully server-side.
+Zefir's Optimizations is a server-side Fabric mod for Minecraft 1.21.1 and 26.2 that ticks entities in parallel with mod compatibility in mind.
 
 **You need at least 2 cores to see a difference. The more cores, the better.**
 
